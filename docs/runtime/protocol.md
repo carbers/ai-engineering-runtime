@@ -158,6 +158,30 @@ The run-log replay slice also stays in the control plane:
 - it returns `replayable` or `rejected` with stable reason codes
 - replayed history is context and evidence input only, not the authoritative workflow state source
 
+## Run-history selection rules
+
+- `run-history-select` requires one explicit artifact target selector:
+  - `spec`
+  - `plan`
+  - `output`
+- optional `node` and replay `signal-kind` filters further narrow the match set
+- selection reuses replay-normalized history rather than scanning raw log payloads directly as a public contract
+- matches are ordered newest first from filename timestamps
+- exact multiple matches are returned as an ordered result set rather than treated as ambiguity in this slice
+- no-match results return stable reason codes
+
+## Run-summary rules
+
+- each node run materializes a summary artifact under `.runtime/summaries/<run-id>.json`
+- a run summary is a control-plane artifact, not a narrative report
+- summary query supports:
+  - explicit run-log path
+  - run id
+  - latest run-log selection with optional node filter
+- summary loading reuses normalized history selection, compact signal projection, and terminal-state resolution
+- if a requested summary artifact is missing or invalid, the runtime rebuilds it from the source run log
+- summary remains a derived review view over run logs, not a new authoritative workflow state source
+
 ## Write-back destination rules
 
 - `facts`
@@ -175,5 +199,6 @@ The run-log replay slice also stays in the control plane:
 ## Support level in this pass
 
 - fully supported: discovery and parsing for the canonical roadmap plan, task specs, facts, and skills
-- executable support: `plan-readiness-check`, `task-spec-readiness-check`, `plan` -> `task-spec`, `validation-collect`, `writeback-classifier`, `followup-suggester`, `executor-dispatch`, and `result-log-replay`
+- executable support: `plan-readiness-check`, `task-spec-readiness-check`, `plan` -> `task-spec`, `validation-collect`, `writeback-classifier`, `followup-suggester`, `executor-dispatch`, `result-log-replay`, `run-history-select`, and `run-summary`
+- internal normalized support: exact replay-backed history selection, compact replay-signal projection, and canonical terminal-state resolution
 - documented only for now: deeper validation result ingestion

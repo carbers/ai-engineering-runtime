@@ -17,6 +17,11 @@ from ai_engineering_runtime.nodes.result_log_replay import (
     ResultLogReplayNode,
     ResultLogReplayRequest,
 )
+from ai_engineering_runtime.nodes.run_history_select import (
+    RunHistorySelectNode,
+    RunHistorySelectRequest,
+)
+from ai_engineering_runtime.nodes.run_summary import RunSummaryNode, RunSummaryRequest
 from ai_engineering_runtime.nodes.executor_dispatch import (
     ExecutorDispatchNode,
     ExecutorDispatchRequest,
@@ -37,6 +42,7 @@ from ai_engineering_runtime.nodes.writeback_classifier import (
     WritebackClassifierNode,
     WritebackClassifierRequest,
 )
+from ai_engineering_runtime.run_logs import ArtifactTargetKind, ReplaySignalKind
 from ai_engineering_runtime.state import (
     CloseoutHint,
     DispatchMode,
@@ -197,6 +203,52 @@ def build_parser() -> argparse.ArgumentParser:
         help="Optional node-name filter when selecting with --latest.",
     )
 
+    run_history_select = subparsers.add_parser(
+        "run-history-select",
+        help="Select replayable prior runs relevant to one explicit artifact target.",
+    )
+    history_target = run_history_select.add_mutually_exclusive_group(required=True)
+    history_target.add_argument("--spec", help="Select history for one task spec path.")
+    history_target.add_argument("--plan", help="Select history for one plan path.")
+    history_target.add_argument("--output", help="Select history for one output path.")
+    run_history_select.add_argument(
+        "--node",
+        help="Optional replayed node-name filter.",
+    )
+    run_history_select.add_argument(
+        "--signal-kind",
+        choices=[kind.value for kind in ReplaySignalKind],
+        help="Optional replay signal kind filter.",
+    )
+    run_history_select.add_argument(
+        "--limit",
+        type=int,
+        default=5,
+        help="Maximum number of newest matches to return.",
+    )
+
+    run_summary = subparsers.add_parser(
+        "run-summary",
+        help="Load or materialize one stable run summary from current or historical run logs.",
+    )
+    summary_target = run_summary.add_mutually_exclusive_group(required=True)
+    summary_target.add_argument("--log", help="Explicit path to a run log JSON file.")
+    summary_target.add_argument("--run-id", help="Run id in <timestamp-node> form.")
+    summary_target.add_argument(
+        "--latest",
+        action="store_true",
+        help="Select the latest matching run log under .runtime/runs/.",
+    )
+    run_summary.add_argument(
+        "--node",
+        help="Optional node-name filter when selecting with --latest.",
+    )
+    run_summary.add_argument(
+        "--json",
+        action="store_true",
+        help="Emit the materialized run summary as JSON after the status lines.",
+    )
+
     return parser
 
 
@@ -217,6 +269,8 @@ def main(
         "plan-to-spec",
         "writeback-classifier",
         "result-log-replay",
+        "run-history-select",
+        "run-summary",
     }:
         parser.print_help()
         return 1
@@ -316,6 +370,37 @@ def main(
         _emit_result(result, adapter, dry_run=False)
         return 0 if result.success else 1
 
+    if args.command == "run-history-select":
+        artifact_kind, artifact_path = _parse_history_target(args)
+        result = engine.run(
+            RunHistorySelectNode(
+                RunHistorySelectRequest(
+                    artifact_kind=artifact_kind,
+                    artifact_path=artifact_path,
+                    node_name=args.node,
+                    signal_kind=_parse_replay_signal_kind(args.signal_kind),
+                    limit=args.limit,
+                )
+            )
+        )
+        _emit_result(result, adapter, dry_run=False)
+        return 0 if result.success else 1
+
+    if args.command == "run-summary":
+        result = engine.run(
+            RunSummaryNode(
+                RunSummaryRequest(
+                    log_path=Path(args.log) if args.log else None,
+                    run_id=args.run_id,
+                    latest=bool(args.latest),
+                    node_name=args.node,
+                    json_output=bool(args.json),
+                )
+            )
+        )
+        _emit_result(result, adapter, dry_run=False)
+        return 0 if result.success else 1
+
     request = PlanToSpecRequest(
         plan_path=Path(args.plan),
         dry_run=args.dry_run,
@@ -358,6 +443,50 @@ def _emit_result(result: RunResult, adapter: FileSystemAdapter, *, dry_run: bool
             )
         if result.replay.signal_kind is not None and result.replay.signal_value is not None:
             print(f"Signal: {result.replay.signal_kind.value}={result.replay.signal_value}", file=stream)
+    if result.history_selection is not None:
+        print(f"History: {result.history_selection.status.value}", file=stream)
+        if result.history_selection.selection_basis:
+            print(f"Basis: {', '.join(result.history_selection.selection_basis)}", file=stream)
+        print(f"Matches: {len(result.history_selection.matches)}", file=stream)
+        for match in result.history_selection.matches:
+            ordered_at = match.ordered_at.isoformat() if match.ordered_at is not None else "unknown"
+            signal = (
+                f"{match.signal_kind.value}={match.signal_value}"
+                if match.signal_kind is not None and match.signal_value is not None
+                else "no-signal"
+            )
+            target = (
+                f"{match.artifact_target.kind.value} {match.artifact_target.path}"
+                if match.artifact_target is not None
+                else "no-target"
+            )
+            print(f"- {ordered_at} {match.node_name}: {signal} ({target})", file=stream)
+    if result.summary is not None and result.metadata.get("summary_output_format") != "json":
+        print(f"Summary Run: {result.summary.run_id}", file=stream)
+        print(f"Summary Node: {result.summary.node_name}", file=stream)
+        print(f"Summary Source Log: {adapter.display_path(result.summary.source_log_path)}", file=stream)
+        if result.summary.ordered_at is not None:
+            print(f"Summary Ordered At: {result.summary.ordered_at.isoformat()}", file=stream)
+        print(f"Terminal: {result.summary.terminal_state.status.value}", file=stream)
+        if result.summary.terminal_state.workflow_state is not None:
+            print(f"Workflow State: {result.summary.terminal_state.workflow_state}", file=stream)
+        if (
+            result.summary.terminal_state.signal_kind is not None
+            and result.summary.terminal_state.signal_value is not None
+        ):
+            print(
+                "Summary Signal: "
+                f"{result.summary.terminal_state.signal_kind}={result.summary.terminal_state.signal_value}",
+                file=stream,
+            )
+        if result.summary.terminal_state.stop_reason_code is not None:
+            print(
+                "Summary Reason: "
+                f"{result.summary.terminal_state.stop_reason_code} {result.summary.terminal_state.stop_reason_message}",
+                file=stream,
+            )
+        if result.summary.history is not None:
+            print(f"History Matches: {result.summary.history.match_count}", file=stream)
     if result.dispatch is not None:
         print(f"Dispatch: {result.dispatch.status.value}", file=stream)
         print(f"Executor: {result.dispatch.target.value}", file=stream)
@@ -389,6 +518,10 @@ def _emit_result(result: RunResult, adapter: FileSystemAdapter, *, dry_run: bool
         for reason in result.replay.reasons:
             printed_reasons.add((reason.code, reason.message, reason.field))
             print(f"- {reason.code}: {reason.message}", file=stream)
+    if result.history_selection is not None:
+        for reason in result.history_selection.reasons:
+            printed_reasons.add((reason.code, reason.message, reason.field))
+            print(f"- {reason.code}: {reason.message}", file=stream)
     if result.dispatch is not None:
         for reason in result.dispatch.reasons:
             printed_reasons.add((reason.code, reason.message, reason.field))
@@ -402,7 +535,8 @@ def _emit_result(result: RunResult, adapter: FileSystemAdapter, *, dry_run: bool
         if identity in printed_reasons:
             continue
         print(f"- {issue.code}: {issue.message}", file=stream)
-    if result.success and dry_run and result.rendered_output is not None:
+    render_always = result.metadata.get("summary_output_format") == "json"
+    if result.success and result.rendered_output is not None and (dry_run or render_always):
         print("", file=stream)
         print(result.rendered_output.rstrip(), file=stream)
 
@@ -449,3 +583,17 @@ def _parse_executor_target(value: str | None) -> ExecutorTarget:
 
 def _parse_dispatch_mode(value: str | None) -> DispatchMode:
     return DispatchMode(value or DispatchMode.PREVIEW.value)
+
+
+def _parse_replay_signal_kind(value: str | None) -> ReplaySignalKind | None:
+    if value is None:
+        return None
+    return ReplaySignalKind(value)
+
+
+def _parse_history_target(args: argparse.Namespace) -> tuple[ArtifactTargetKind, Path]:
+    if args.spec:
+        return ArtifactTargetKind.SPEC, Path(args.spec)
+    if args.plan:
+        return ArtifactTargetKind.PLAN, Path(args.plan)
+    return ArtifactTargetKind.OUTPUT, Path(args.output)

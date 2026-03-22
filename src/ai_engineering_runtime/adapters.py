@@ -36,6 +36,11 @@ class FileSystemAdapter:
         timestamp = datetime.now().strftime("%Y%m%dT%H%M%S%f")
         return run_dir / f"{timestamp}-{node_name}.json"
 
+    def build_run_summary_path(self, run_id: str) -> Path:
+        summary_dir = self.repo_root / ".runtime" / "summaries"
+        summary_dir.mkdir(parents=True, exist_ok=True)
+        return summary_dir / f"{run_id}.json"
+
     def write_json(self, path: Path, payload: dict[str, object]) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")

@@ -18,6 +18,11 @@ _REPLAY_SIGNAL_FIELDS = (
     "followup",
     "dispatch",
 )
+_DEFAULT_DISCOVERY_EXCLUSIONS = {
+    "result-log-replay",
+    "run-history-select",
+    "run-summary",
+}
 
 
 class ReplayStatus(str, Enum):
@@ -79,6 +84,32 @@ class ReplayResult:
         }
 
 
+class RunRecordStatus(str, Enum):
+    LOADABLE = "loadable"
+    REJECTED = "rejected"
+
+
+@dataclass(frozen=True)
+class RunRecord:
+    status: RunRecordStatus
+    source_log_path: Path | None = None
+    ordered_at: datetime | None = None
+    node_name: str | None = None
+    success: bool | None = None
+    from_state: str | None = None
+    to_state: str | None = None
+    artifact_target: ArtifactTarget | None = None
+    signal_kind: ReplaySignalKind | None = None
+    signal_value: str | None = None
+    signal_reasons: tuple[RuntimeReason, ...] = ()
+    issues: tuple[RuntimeReason, ...] = ()
+    reasons: tuple[RuntimeReason, ...] = ()
+
+    @property
+    def is_loadable(self) -> bool:
+        return self.status is RunRecordStatus.LOADABLE
+
+
 @dataclass(frozen=True)
 class _SignalSpec:
     field: str
@@ -109,7 +140,7 @@ def discover_run_logs(repo_root: Path, *, node_name: str | None = None) -> list[
         ordered_at, parsed_node = parsed
         if node_name is not None and parsed_node != node_name:
             continue
-        if node_name is None and parsed_node == "result-log-replay":
+        if node_name is None and parsed_node in _DEFAULT_DISCOVERY_EXCLUSIONS:
             continue
         ordered.append((ordered_at, path.resolve()))
 
@@ -387,6 +418,118 @@ def missing_selection_result(*, node_name: str | None = None) -> ReplayResult:
     )
 
 
+def parse_run_log_name(name: str) -> tuple[datetime, str] | None:
+    return _parse_run_log_name(name)
+
+
+def load_run_record(log_path: Path) -> RunRecord:
+    resolved_log_path = log_path.resolve()
+    if not resolved_log_path.exists():
+        return RunRecord(
+            status=RunRecordStatus.REJECTED,
+            source_log_path=resolved_log_path,
+            reasons=(
+                RuntimeReason(
+                    code="missing-run-log",
+                    message=f"Run log not found: {resolved_log_path.as_posix()}",
+                    field="log_path",
+                ),
+            ),
+        )
+
+    parsed_name = _parse_run_log_name(resolved_log_path.name)
+    if parsed_name is None:
+        return RunRecord(
+            status=RunRecordStatus.REJECTED,
+            source_log_path=resolved_log_path,
+            node_name=_fallback_node_name(resolved_log_path.name),
+            reasons=(
+                RuntimeReason(
+                    code="invalid-run-log-filename-timestamp",
+                    message=f"Run log filename does not contain a valid ordering timestamp: {resolved_log_path.name}",
+                    field="log_path",
+                ),
+            ),
+        )
+
+    ordered_at, fallback_node = parsed_name
+    try:
+        payload = json.loads(resolved_log_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return RunRecord(
+            status=RunRecordStatus.REJECTED,
+            source_log_path=resolved_log_path,
+            ordered_at=ordered_at,
+            node_name=fallback_node,
+            reasons=(
+                RuntimeReason(
+                    code="malformed-run-log-json",
+                    message=f"Run log is not valid JSON: {resolved_log_path.name}",
+                    field="log_path",
+                ),
+            ),
+        )
+
+    if not isinstance(payload, dict):
+        return RunRecord(
+            status=RunRecordStatus.REJECTED,
+            source_log_path=resolved_log_path,
+            ordered_at=ordered_at,
+            node_name=fallback_node,
+            reasons=(
+                RuntimeReason(
+                    code="invalid-run-log-envelope",
+                    message="Run log root payload must be a JSON object.",
+                    field="payload",
+                ),
+            ),
+        )
+
+    issues = _parse_reason_list(payload.get("issues"), field="issues")
+    if issues is None:
+        return RunRecord(
+            status=RunRecordStatus.REJECTED,
+            source_log_path=resolved_log_path,
+            ordered_at=ordered_at,
+            node_name=_coerce_str(payload.get("node")) or fallback_node,
+            reasons=(
+                RuntimeReason(
+                    code="invalid-run-log-envelope",
+                    message="Run log issues must be a list of structured reasons.",
+                    field="issues",
+                ),
+            ),
+        )
+
+    envelope_errors = _validate_run_log_envelope(payload)
+    if envelope_errors:
+        return RunRecord(
+            status=RunRecordStatus.REJECTED,
+            source_log_path=resolved_log_path,
+            ordered_at=ordered_at,
+            node_name=_coerce_str(payload.get("node")) or fallback_node,
+            issues=issues,
+            reasons=_dedupe_reasons((*envelope_errors, *issues)),
+        )
+
+    node_name = str(payload["node"])
+    signal_kind, signal_value, signal_reasons = _extract_record_signal(node_name, payload)
+    return RunRecord(
+        status=RunRecordStatus.LOADABLE,
+        source_log_path=resolved_log_path,
+        ordered_at=ordered_at,
+        node_name=node_name,
+        success=bool(payload["success"]),
+        from_state=str(payload["from_state"]),
+        to_state=str(payload["to_state"]),
+        artifact_target=_resolve_artifact_target(payload),
+        signal_kind=signal_kind,
+        signal_value=signal_value,
+        signal_reasons=signal_reasons,
+        issues=issues,
+    )
+
+
 def _parse_run_log_name(name: str) -> tuple[datetime, str] | None:
     match = _RUN_LOG_NAME_RE.match(name)
     if match is None:
@@ -468,6 +611,26 @@ def _resolve_artifact_target(payload: dict[str, Any]) -> ArtifactTarget | None:
     if _coerce_str(payload.get("output_path")) is not None:
         return ArtifactTarget(ArtifactTargetKind.OUTPUT, str(payload["output_path"]))
     return None
+
+
+def _extract_record_signal(
+    node_name: str,
+    payload: dict[str, Any],
+) -> tuple[ReplaySignalKind | None, str | None, tuple[RuntimeReason, ...]]:
+    signal_spec = _SUPPORTED_SIGNAL_SPECS.get(node_name)
+    if signal_spec is None:
+        return None, None, ()
+
+    signal_payload = payload.get(signal_spec.field)
+    if not isinstance(signal_payload, dict):
+        return None, None, ()
+
+    signal_value = _coerce_str(signal_payload.get(signal_spec.value_key))
+    if signal_value is None:
+        return None, None, ()
+
+    typed_reasons = _parse_reason_list(signal_payload.get("reasons", []), field=f"{signal_spec.field}.reasons")
+    return signal_spec.kind, signal_value, typed_reasons or ()
 
 
 def _parse_reason_list(value: object, *, field: str) -> tuple[RuntimeReason, ...] | None:

@@ -15,7 +15,7 @@ This repository establishes a practical runtime layer that can:
 5. collect validation results
 6. suggest write-back and follow-up work
 
-The current implementation is intentionally smaller than that full direction: one stdlib-only Python CLI, eight real nodes, and one documented contract for checking plan readiness, checking task-spec readiness, compiling a plan into a narrow draft task spec, aggregating validation evidence, classifying closeout write-back candidates, suggesting the next control-plane action, preparing a minimal shell-based executor handoff, and reconstructing replay-friendly outcomes from prior run logs.
+The current implementation is intentionally smaller than that full direction: one stdlib-only Python CLI, ten real nodes, and one documented contract for checking plan readiness, checking task-spec readiness, compiling a plan into a narrow draft task spec, aggregating validation evidence, classifying closeout write-back candidates, suggesting the next control-plane action, preparing a minimal shell-based executor handoff, reconstructing replay-friendly outcomes from prior run logs, selecting replayable relevant history, and materializing stable run summaries.
 
 ## What stays the same
 
@@ -66,6 +66,8 @@ ae-runtime writeback-classifier --text "..." --kind workflow_pattern
 ae-runtime followup-suggester --validation-status failed
 ae-runtime executor-dispatch --spec docs/specs/20260322-007-executor-dispatch-adapter-shell.md --mode preview
 ae-runtime result-log-replay --latest --node validation-collect
+ae-runtime run-history-select --spec docs/specs/20260322-005-validation-collect-foundation.md --node validation-collect
+ae-runtime run-summary --latest --node validation-collect
 ```
 
 Use `plan-readiness-check` to inspect a plan artifact and return a structured readiness outcome with stable reason codes.
@@ -85,7 +87,10 @@ These commands currently:
 - suggest a single next control-plane action from readiness, validation, write-back, and closeout signals
 - prepare or exercise a minimal shell-based dispatch handoff for ready task specs
 - inspect one prior run log at a time and normalize its recorded signal as replay-oriented context
+- select replayable prior runs relevant to one exact artifact target
+- project compact history signals and canonical terminal state into stable run summaries
 - write a JSON run log under `.runtime/runs/`
+- write a JSON run summary under `.runtime/summaries/`
 
 ## What this repository is not
 

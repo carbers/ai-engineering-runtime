@@ -540,6 +540,89 @@ class CliTests(unittest.TestCase):
             self.assertIn("Replay: rejected", stderr.getvalue())
             self.assertIn("malformed-run-log-json", stderr.getvalue())
 
+    def test_run_history_select_reports_selected_matches(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            _copy_run_log_fixture(root, "20260322T191727074753-validation-collect.json")
+            _copy_run_log_fixture(root, "20260322T191755447854-validation-collect.json")
+
+            stdout = io.StringIO()
+            stderr = io.StringIO()
+            with redirect_stdout(stdout), redirect_stderr(stderr):
+                exit_code = main(
+                    [
+                        "run-history-select",
+                        "--spec",
+                        "docs/specs/20260322-005-validation-collect-foundation.md",
+                        "--node",
+                        "validation-collect",
+                        "--limit",
+                        "2",
+                    ],
+                    repo_root=root,
+                    today=date(2026, 3, 22),
+                )
+
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(stderr.getvalue(), "")
+            self.assertIn("run-history-select completed", stdout.getvalue())
+            self.assertIn("History: selected", stdout.getvalue())
+            self.assertIn("Matches: 2", stdout.getvalue())
+            self.assertIn("2026-03-22T19:17:55.447854", stdout.getvalue())
+
+    def test_run_summary_reports_latest_human_summary(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            _copy_run_log_fixture(root, "20260322T191727074753-validation-collect.json")
+            _copy_run_log_fixture(root, "20260322T191755447854-validation-collect.json")
+
+            stdout = io.StringIO()
+            stderr = io.StringIO()
+            with redirect_stdout(stdout), redirect_stderr(stderr):
+                exit_code = main(
+                    [
+                        "run-summary",
+                        "--latest",
+                        "--node",
+                        "validation-collect",
+                    ],
+                    repo_root=root,
+                    today=date(2026, 3, 22),
+                )
+
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(stderr.getvalue(), "")
+            self.assertIn("run-summary completed", stdout.getvalue())
+            self.assertIn("Summary Node: validation-collect", stdout.getvalue())
+            self.assertIn("Terminal: review", stdout.getvalue())
+            self.assertIn("Summary Signal: validation=passed", stdout.getvalue())
+            self.assertIn("History Matches: 1", stdout.getvalue())
+
+    def test_run_summary_reports_json_view(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            _copy_run_log_fixture(root, "20260322T180645808422-plan-to-spec.json")
+
+            stdout = io.StringIO()
+            stderr = io.StringIO()
+            with redirect_stdout(stdout), redirect_stderr(stderr):
+                exit_code = main(
+                    [
+                        "run-summary",
+                        "--log",
+                        ".runtime/runs/20260322T180645808422-plan-to-spec.json",
+                        "--json",
+                    ],
+                    repo_root=root,
+                    today=date(2026, 3, 22),
+                )
+
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(stderr.getvalue(), "")
+            self.assertIn("run-summary completed", stdout.getvalue())
+            self.assertIn("\"run_id\": \"20260322T180645808422-plan-to-spec\"", stdout.getvalue())
+            self.assertIn("\"status\": \"ready\"", stdout.getvalue())
+
 
 if __name__ == "__main__":
     unittest.main()

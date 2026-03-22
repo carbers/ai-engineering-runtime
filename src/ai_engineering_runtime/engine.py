@@ -4,7 +4,9 @@ from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import TYPE_CHECKING, Protocol
 
+from ai_engineering_runtime.history_selection import HistorySelectionResult
 from ai_engineering_runtime.run_logs import ReplayResult
+from ai_engineering_runtime.run_summary import RunSummary
 from ai_engineering_runtime.state import (
     DispatchResult,
     FollowupResult,
@@ -39,6 +41,8 @@ class RunResult:
     followup: FollowupResult | None = None
     dispatch: DispatchResult | None = None
     replay: ReplayResult | None = None
+    history_selection: HistorySelectionResult | None = None
+    summary: RunSummary | None = None
     plan_path: Path | None = None
     spec_path: Path | None = None
     output_path: Path | None = None
@@ -66,6 +70,12 @@ class RunResult:
             "followup": self.followup.to_record() if self.followup is not None else None,
             "dispatch": self.dispatch.to_record() if self.dispatch is not None else None,
             "replay": self.replay.to_record(adapter.display_path) if self.replay is not None else None,
+            "history_selection": (
+                self.history_selection.to_record(adapter.display_path)
+                if self.history_selection is not None
+                else None
+            ),
+            "summary": self.summary.to_record(adapter.display_path) if self.summary is not None else None,
             "metadata": self.metadata,
             "rendered_output": self.rendered_output,
         }
@@ -76,4 +86,9 @@ class RuntimeEngine:
         self.adapter = adapter
 
     def run(self, node: RuntimeNode) -> RunResult:
-        return node.execute(self.adapter)
+        result = node.execute(self.adapter)
+        if result.log_path is not None:
+            from ai_engineering_runtime.run_summary import materialize_summary_for_result
+
+            materialize_summary_for_result(self.adapter, result)
+        return result
