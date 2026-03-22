@@ -6,6 +6,8 @@ from typing import TYPE_CHECKING, Protocol
 
 from ai_engineering_runtime.history_selection import HistorySelectionResult
 from ai_engineering_runtime.run_logs import ReplayResult
+from ai_engineering_runtime.followup_package import FollowupPackage
+from ai_engineering_runtime.gate_evaluator import NodeGateResult
 from ai_engineering_runtime.run_summary import RunSummary
 from ai_engineering_runtime.state import (
     DispatchResult,
@@ -16,6 +18,8 @@ from ai_engineering_runtime.state import (
     WorkflowState,
     WritebackResult,
 )
+from ai_engineering_runtime.validation_rollup import ValidationRollup
+from ai_engineering_runtime.writeback_package import WritebackPackage
 
 if TYPE_CHECKING:
     from ai_engineering_runtime.adapters import FileSystemAdapter
@@ -43,6 +47,10 @@ class RunResult:
     replay: ReplayResult | None = None
     history_selection: HistorySelectionResult | None = None
     summary: RunSummary | None = None
+    gate: NodeGateResult | None = None
+    validation_rollup: ValidationRollup | None = None
+    writeback_package: WritebackPackage | None = None
+    followup_package: FollowupPackage | None = None
     plan_path: Path | None = None
     spec_path: Path | None = None
     output_path: Path | None = None
@@ -76,6 +84,16 @@ class RunResult:
                 else None
             ),
             "summary": self.summary.to_record(adapter.display_path) if self.summary is not None else None,
+            "gate": self.gate.to_record() if self.gate is not None else None,
+            "validation_rollup": (
+                self.validation_rollup.to_record() if self.validation_rollup is not None else None
+            ),
+            "writeback_package": (
+                self.writeback_package.to_record() if self.writeback_package is not None else None
+            ),
+            "followup_package": (
+                self.followup_package.to_record() if self.followup_package is not None else None
+            ),
             "metadata": self.metadata,
             "rendered_output": self.rendered_output,
         }

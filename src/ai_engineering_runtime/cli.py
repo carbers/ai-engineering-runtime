@@ -17,11 +17,24 @@ from ai_engineering_runtime.nodes.result_log_replay import (
     ResultLogReplayNode,
     ResultLogReplayRequest,
 )
+from ai_engineering_runtime.nodes.node_gate import NodeGateNode, NodeGateRequest
 from ai_engineering_runtime.nodes.run_history_select import (
     RunHistorySelectNode,
     RunHistorySelectRequest,
 )
 from ai_engineering_runtime.nodes.run_summary import RunSummaryNode, RunSummaryRequest
+from ai_engineering_runtime.nodes.validation_rollup import (
+    ValidationRollupNode,
+    ValidationRollupRequest,
+)
+from ai_engineering_runtime.nodes.writeback_package import (
+    WritebackPackageNode,
+    WritebackPackageRequest,
+)
+from ai_engineering_runtime.nodes.followup_package import (
+    FollowupPackageNode,
+    FollowupPackageRequest,
+)
 from ai_engineering_runtime.nodes.executor_dispatch import (
     ExecutorDispatchNode,
     ExecutorDispatchRequest,
@@ -249,6 +262,99 @@ def build_parser() -> argparse.ArgumentParser:
         help="Emit the materialized run summary as JSON after the status lines.",
     )
 
+    node_gate = subparsers.add_parser(
+        "node-gate",
+        help="Evaluate whether one declared node is eligible, blocked, skipped, not-applicable, or unknown for one run context.",
+    )
+    node_gate.add_argument(
+        "--node",
+        required=True,
+        help="Declared node name to evaluate.",
+    )
+    gate_target = node_gate.add_mutually_exclusive_group(required=True)
+    gate_target.add_argument("--log", help="Explicit path to a source run log JSON file.")
+    gate_target.add_argument("--run-id", help="Run id in <timestamp-node> form.")
+    gate_target.add_argument(
+        "--latest",
+        action="store_true",
+        help="Select the latest matching run log under .runtime/runs/.",
+    )
+    node_gate.add_argument(
+        "--summary-node",
+        help="Optional node-name filter when selecting with --latest.",
+    )
+    node_gate.add_argument(
+        "--json",
+        action="store_true",
+        help="Emit the gate result as JSON after the status lines.",
+    )
+
+    validation_rollup = subparsers.add_parser(
+        "validation-rollup",
+        help="Load or materialize one validation rollup artifact from a validation run.",
+    )
+    rollup_target = validation_rollup.add_mutually_exclusive_group(required=True)
+    rollup_target.add_argument("--log", help="Explicit path to a validation run log JSON file.")
+    rollup_target.add_argument("--run-id", help="Run id in <timestamp-node> form.")
+    rollup_target.add_argument(
+        "--latest",
+        action="store_true",
+        help="Select the latest validation run log under .runtime/runs/.",
+    )
+    validation_rollup.add_argument(
+        "--node",
+        help="Optional node-name filter when selecting with --latest.",
+    )
+    validation_rollup.add_argument(
+        "--json",
+        action="store_true",
+        help="Emit the validation rollup as JSON after the status lines.",
+    )
+
+    writeback_package = subparsers.add_parser(
+        "writeback-package",
+        help="Load or materialize one write-back package artifact from a classifier run.",
+    )
+    writeback_target = writeback_package.add_mutually_exclusive_group(required=True)
+    writeback_target.add_argument("--log", help="Explicit path to a write-back classifier run log JSON file.")
+    writeback_target.add_argument("--run-id", help="Run id in <timestamp-node> form.")
+    writeback_target.add_argument(
+        "--latest",
+        action="store_true",
+        help="Select the latest write-back classifier run log under .runtime/runs/.",
+    )
+    writeback_package.add_argument(
+        "--node",
+        help="Optional node-name filter when selecting with --latest.",
+    )
+    writeback_package.add_argument(
+        "--json",
+        action="store_true",
+        help="Emit the write-back package as JSON after the status lines.",
+    )
+
+    followup_package = subparsers.add_parser(
+        "followup-package",
+        help="Load or materialize one follow-up package artifact from a follow-up run.",
+    )
+    followup_target = followup_package.add_mutually_exclusive_group(required=True)
+    followup_target.add_argument("--log", help="Explicit path to a follow-up run log JSON file.")
+    followup_target.add_argument("--run-id", help="Run id in <timestamp-node> form.")
+    followup_target.add_argument(
+        "--latest",
+        action="store_true",
+        help="Select the latest follow-up run log under .runtime/runs/.",
+    )
+    followup_package.add_argument(
+        "--node",
+        help="Optional node-name filter when selecting with --latest.",
+    )
+    followup_package.add_argument(
+        "--json",
+        action="store_true",
+        help="Emit the follow-up package as JSON after the status lines.",
+    )
+
     return parser
 
 
@@ -271,6 +377,10 @@ def main(
         "result-log-replay",
         "run-history-select",
         "run-summary",
+        "node-gate",
+        "validation-rollup",
+        "writeback-package",
+        "followup-package",
     }:
         parser.print_help()
         return 1
@@ -401,6 +511,67 @@ def main(
         _emit_result(result, adapter, dry_run=False)
         return 0 if result.success else 1
 
+    if args.command == "node-gate":
+        result = engine.run(
+            NodeGateNode(
+                NodeGateRequest(
+                    node_name=args.node,
+                    log_path=Path(args.log) if args.log else None,
+                    run_id=args.run_id,
+                    latest=bool(args.latest),
+                    summary_node_name=args.summary_node,
+                    json_output=bool(args.json),
+                )
+            )
+        )
+        _emit_result(result, adapter, dry_run=False)
+        return 0 if result.success else 1
+
+    if args.command == "validation-rollup":
+        result = engine.run(
+            ValidationRollupNode(
+                ValidationRollupRequest(
+                    log_path=Path(args.log) if args.log else None,
+                    run_id=args.run_id,
+                    latest=bool(args.latest),
+                    node_name=args.node,
+                    json_output=bool(args.json),
+                )
+            )
+        )
+        _emit_result(result, adapter, dry_run=False)
+        return 0 if result.success else 1
+
+    if args.command == "writeback-package":
+        result = engine.run(
+            WritebackPackageNode(
+                WritebackPackageRequest(
+                    log_path=Path(args.log) if args.log else None,
+                    run_id=args.run_id,
+                    latest=bool(args.latest),
+                    node_name=args.node,
+                    json_output=bool(args.json),
+                )
+            )
+        )
+        _emit_result(result, adapter, dry_run=False)
+        return 0 if result.success else 1
+
+    if args.command == "followup-package":
+        result = engine.run(
+            FollowupPackageNode(
+                FollowupPackageRequest(
+                    log_path=Path(args.log) if args.log else None,
+                    run_id=args.run_id,
+                    latest=bool(args.latest),
+                    node_name=args.node,
+                    json_output=bool(args.json),
+                )
+            )
+        )
+        _emit_result(result, adapter, dry_run=False)
+        return 0 if result.success else 1
+
     request = PlanToSpecRequest(
         plan_path=Path(args.plan),
         dry_run=args.dry_run,
@@ -487,6 +658,25 @@ def _emit_result(result: RunResult, adapter: FileSystemAdapter, *, dry_run: bool
             )
         if result.summary.history is not None:
             print(f"History Matches: {result.summary.history.match_count}", file=stream)
+    if result.gate is not None:
+        print(f"Gate Node: {result.gate.node_name}", file=stream)
+        print(f"Gate: {result.gate.status.value}", file=stream)
+        if result.gate.summary_run_id is not None:
+            print(f"Summary Run: {result.gate.summary_run_id}", file=stream)
+    if result.validation_rollup is not None and result.metadata.get("summary_output_format") != "json":
+        print(f"Validation Rollup: {result.validation_rollup.status.value}", file=stream)
+        print(f"Validation Source: {result.validation_rollup.source_log_ref.path}", file=stream)
+        print(f"Findings: {len(result.validation_rollup.findings)}", file=stream)
+    if result.writeback_package is not None and result.metadata.get("summary_output_format") != "json":
+        print(f"Write-back Package: {result.writeback_package.destination.value}", file=stream)
+        print("Actionable: " + ("yes" if result.writeback_package.actionable else "no"), file=stream)
+        if result.writeback_package.suggested_next_action is not None:
+            print(f"Next Action: {result.writeback_package.suggested_next_action}", file=stream)
+    if result.followup_package is not None and result.metadata.get("summary_output_format") != "json":
+        print(f"Follow-up Package: {result.followup_package.action.value}", file=stream)
+        print("Actionable: " + ("yes" if result.followup_package.actionable else "no"), file=stream)
+        if result.followup_package.suggested_next_step is not None:
+            print(f"Next Step: {result.followup_package.suggested_next_step}", file=stream)
     if result.dispatch is not None:
         print(f"Dispatch: {result.dispatch.status.value}", file=stream)
         print(f"Executor: {result.dispatch.target.value}", file=stream)
@@ -528,6 +718,26 @@ def _emit_result(result: RunResult, adapter: FileSystemAdapter, *, dry_run: bool
             print(f"- {reason.code}: {reason.message}", file=stream)
     if result.writeback is not None:
         for reason in result.writeback.reasons:
+            printed_reasons.add((reason.code, reason.message, reason.field))
+            print(f"- {reason.code}: {reason.message}", file=stream)
+    if result.gate is not None:
+        for reason in result.gate.blocking_reasons:
+            printed_reasons.add((reason.code, reason.message, reason.field))
+            print(f"- {reason.code}: {reason.message}", file=stream)
+        for reason in result.gate.advisory_reasons:
+            printed_reasons.add((reason.code, reason.message, reason.field))
+            print(f"- {reason.code}: {reason.message}", file=stream)
+    if result.validation_rollup is not None:
+        for finding in result.validation_rollup.findings:
+            identity = (finding.code, finding.message, finding.field)
+            printed_reasons.add(identity)
+            print(f"- {finding.severity.value}: {finding.code}: {finding.message}", file=stream)
+    if result.writeback_package is not None:
+        for reason in result.writeback_package.reasons:
+            printed_reasons.add((reason.code, reason.message, reason.field))
+            print(f"- {reason.code}: {reason.message}", file=stream)
+    if result.followup_package is not None:
+        for reason in result.followup_package.blockers:
             printed_reasons.add((reason.code, reason.message, reason.field))
             print(f"- {reason.code}: {reason.message}", file=stream)
     for issue in result.issues:

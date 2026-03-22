@@ -16,7 +16,25 @@ RUN_LOG_FIXTURES = ROOT / "tests" / "fixtures" / "run_logs"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
+from ai_engineering_runtime.adapters import FileSystemAdapter  # noqa: E402
 from ai_engineering_runtime.cli import main  # noqa: E402
+from ai_engineering_runtime.engine import RuntimeEngine  # noqa: E402
+from ai_engineering_runtime.nodes.followup_suggester import (  # noqa: E402
+    FollowupSuggesterNode,
+    FollowupSuggesterRequest,
+)
+from ai_engineering_runtime.nodes.validation_collect import (  # noqa: E402
+    ValidationCollectNode,
+    ValidationCollectRequest,
+)
+from ai_engineering_runtime.nodes.writeback_classifier import (  # noqa: E402
+    WritebackClassifierNode,
+    WritebackClassifierRequest,
+)
+from ai_engineering_runtime.state import (  # noqa: E402
+    CloseoutHint,
+    ValidationEvidenceStatus,
+)
 
 
 VALID_ROADMAP = """
@@ -622,6 +640,135 @@ class CliTests(unittest.TestCase):
             self.assertIn("run-summary completed", stdout.getvalue())
             self.assertIn("\"run_id\": \"20260322T180645808422-plan-to-spec\"", stdout.getvalue())
             self.assertIn("\"status\": \"ready\"", stdout.getvalue())
+
+    def test_validation_rollup_reports_latest_rollup(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            adapter = FileSystemAdapter(root)
+            engine = RuntimeEngine(adapter)
+            engine.run(
+                ValidationCollectNode(
+                    ValidationCollectRequest(
+                        command_status=ValidationEvidenceStatus.FAILED,
+                        black_box_status=ValidationEvidenceStatus.PASSED,
+                    )
+                )
+            )
+
+            stdout = io.StringIO()
+            stderr = io.StringIO()
+            with redirect_stdout(stdout), redirect_stderr(stderr):
+                exit_code = main(
+                    [
+                        "validation-rollup",
+                        "--latest",
+                    ],
+                    repo_root=root,
+                    today=date(2026, 3, 23),
+                )
+
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(stderr.getvalue(), "")
+            self.assertIn("validation-rollup completed", stdout.getvalue())
+            self.assertIn("Validation Rollup: blocking", stdout.getvalue())
+            self.assertIn("Findings: 1", stdout.getvalue())
+
+    def test_writeback_package_reports_materialized_package(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            adapter = FileSystemAdapter(root)
+            engine = RuntimeEngine(adapter)
+            result = engine.run(
+                WritebackClassifierNode(
+                    WritebackClassifierRequest(
+                        text="Project-wide context should be written back later.",
+                    )
+                )
+            )
+
+            stdout = io.StringIO()
+            stderr = io.StringIO()
+            with redirect_stdout(stdout), redirect_stderr(stderr):
+                exit_code = main(
+                    [
+                        "writeback-package",
+                        "--run-id",
+                        result.log_path.stem,
+                    ],
+                    repo_root=root,
+                    today=date(2026, 3, 23),
+                )
+
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(stderr.getvalue(), "")
+            self.assertIn("writeback-package completed", stdout.getvalue())
+            self.assertIn("Write-back Package: facts", stdout.getvalue())
+            self.assertIn("Actionable: yes", stdout.getvalue())
+
+    def test_followup_package_reports_materialized_package(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            adapter = FileSystemAdapter(root)
+            engine = RuntimeEngine(adapter)
+            result = engine.run(
+                FollowupSuggesterNode(
+                    FollowupSuggesterRequest(closeout_hint=CloseoutHint.COMPLETE)
+                )
+            )
+
+            stdout = io.StringIO()
+            stderr = io.StringIO()
+            with redirect_stdout(stdout), redirect_stderr(stderr):
+                exit_code = main(
+                    [
+                        "followup-package",
+                        "--run-id",
+                        result.log_path.stem,
+                    ],
+                    repo_root=root,
+                    today=date(2026, 3, 23),
+                )
+
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(stderr.getvalue(), "")
+            self.assertIn("followup-package completed", stdout.getvalue())
+            self.assertIn("Follow-up Package: no_followup_needed", stdout.getvalue())
+            self.assertIn("Actionable: no", stdout.getvalue())
+
+    def test_node_gate_reports_gate_status(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            adapter = FileSystemAdapter(root)
+            engine = RuntimeEngine(adapter)
+            result = engine.run(
+                ValidationCollectNode(
+                    ValidationCollectRequest(
+                        command_status=ValidationEvidenceStatus.PASSED,
+                        black_box_status=ValidationEvidenceStatus.PASSED,
+                    )
+                )
+            )
+
+            stdout = io.StringIO()
+            stderr = io.StringIO()
+            with redirect_stdout(stdout), redirect_stderr(stderr):
+                exit_code = main(
+                    [
+                        "node-gate",
+                        "--node",
+                        "validation-rollup",
+                        "--run-id",
+                        result.log_path.stem,
+                    ],
+                    repo_root=root,
+                    today=date(2026, 3, 23),
+                )
+
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(stderr.getvalue(), "")
+            self.assertIn("node-gate completed", stdout.getvalue())
+            self.assertIn("Gate Node: validation-rollup", stdout.getvalue())
+            self.assertIn("Gate: eligible", stdout.getvalue())
 
 
 if __name__ == "__main__":

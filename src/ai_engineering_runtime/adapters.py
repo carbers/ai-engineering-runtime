@@ -41,6 +41,21 @@ class FileSystemAdapter:
         summary_dir.mkdir(parents=True, exist_ok=True)
         return summary_dir / f"{run_id}.json"
 
+    def build_validation_rollup_path(self, run_id: str) -> Path:
+        rollup_dir = self.repo_root / ".runtime" / "rollups" / "validation"
+        rollup_dir.mkdir(parents=True, exist_ok=True)
+        return rollup_dir / f"{run_id}.json"
+
+    def build_writeback_package_path(self, run_id: str) -> Path:
+        package_dir = self.repo_root / ".runtime" / "packages" / "writeback"
+        package_dir.mkdir(parents=True, exist_ok=True)
+        return package_dir / f"{run_id}.json"
+
+    def build_followup_package_path(self, run_id: str) -> Path:
+        package_dir = self.repo_root / ".runtime" / "packages" / "followup"
+        package_dir.mkdir(parents=True, exist_ok=True)
+        return package_dir / f"{run_id}.json"
+
     def write_json(self, path: Path, payload: dict[str, object]) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")

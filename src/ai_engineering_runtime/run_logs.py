@@ -9,6 +9,18 @@ import re
 from typing import Any, Callable
 
 from ai_engineering_runtime.state import RuntimeReason
+from ai_engineering_runtime.state import (
+    FollowupAction,
+    FollowupResult,
+    ValidationEvidence,
+    ValidationEvidenceKind,
+    ValidationEvidenceStatus,
+    ValidationResult,
+    ValidationStatus,
+    WritebackCandidateKind,
+    WritebackDestination,
+    WritebackResult,
+)
 
 _RUN_LOG_NAME_RE = re.compile(r"^(?P<timestamp>\d{8}T\d{12})-(?P<node>.+)\.json$")
 _REPLAY_SIGNAL_FIELDS = (
@@ -22,6 +34,10 @@ _DEFAULT_DISCOVERY_EXCLUSIONS = {
     "result-log-replay",
     "run-history-select",
     "run-summary",
+    "node-gate",
+    "validation-rollup",
+    "writeback-package",
+    "followup-package",
 }
 
 
@@ -102,6 +118,9 @@ class RunRecord:
     signal_kind: ReplaySignalKind | None = None
     signal_value: str | None = None
     signal_reasons: tuple[RuntimeReason, ...] = ()
+    validation: ValidationResult | None = None
+    writeback: WritebackResult | None = None
+    followup: FollowupResult | None = None
     issues: tuple[RuntimeReason, ...] = ()
     reasons: tuple[RuntimeReason, ...] = ()
 
@@ -512,6 +531,66 @@ def load_run_record(log_path: Path) -> RunRecord:
             reasons=_dedupe_reasons((*envelope_errors, *issues)),
         )
 
+    typed_validation = _parse_validation_result(payload.get("validation"))
+    if typed_validation is _INVALID:
+        return RunRecord(
+            status=RunRecordStatus.REJECTED,
+            source_log_path=resolved_log_path,
+            ordered_at=ordered_at,
+            node_name=_coerce_str(payload.get("node")) or fallback_node,
+            issues=issues,
+            reasons=_dedupe_reasons(
+                (
+                    RuntimeReason(
+                        code="invalid-run-log-envelope",
+                        message="Run log validation payload must use the current structured schema.",
+                        field="validation",
+                    ),
+                    *issues,
+                )
+            ),
+        )
+
+    typed_writeback = _parse_writeback_result(payload.get("writeback"))
+    if typed_writeback is _INVALID:
+        return RunRecord(
+            status=RunRecordStatus.REJECTED,
+            source_log_path=resolved_log_path,
+            ordered_at=ordered_at,
+            node_name=_coerce_str(payload.get("node")) or fallback_node,
+            issues=issues,
+            reasons=_dedupe_reasons(
+                (
+                    RuntimeReason(
+                        code="invalid-run-log-envelope",
+                        message="Run log writeback payload must use the current structured schema.",
+                        field="writeback",
+                    ),
+                    *issues,
+                )
+            ),
+        )
+
+    typed_followup = _parse_followup_result(payload.get("followup"))
+    if typed_followup is _INVALID:
+        return RunRecord(
+            status=RunRecordStatus.REJECTED,
+            source_log_path=resolved_log_path,
+            ordered_at=ordered_at,
+            node_name=_coerce_str(payload.get("node")) or fallback_node,
+            issues=issues,
+            reasons=_dedupe_reasons(
+                (
+                    RuntimeReason(
+                        code="invalid-run-log-envelope",
+                        message="Run log followup payload must use the current structured schema.",
+                        field="followup",
+                    ),
+                    *issues,
+                )
+            ),
+        )
+
     node_name = str(payload["node"])
     signal_kind, signal_value, signal_reasons = _extract_record_signal(node_name, payload)
     return RunRecord(
@@ -526,6 +605,9 @@ def load_run_record(log_path: Path) -> RunRecord:
         signal_kind=signal_kind,
         signal_value=signal_value,
         signal_reasons=signal_reasons,
+        validation=typed_validation,
+        writeback=typed_writeback,
+        followup=typed_followup,
         issues=issues,
     )
 
@@ -633,6 +715,102 @@ def _extract_record_signal(
     return signal_spec.kind, signal_value, typed_reasons or ()
 
 
+_INVALID = object()
+
+
+def _parse_validation_result(value: object) -> ValidationResult | None | object:
+    if value is None:
+        return None
+    if not isinstance(value, dict):
+        return _INVALID
+
+    status = _parse_enum(value.get("status"), ValidationStatus)
+    if status is None:
+        return _INVALID
+
+    evidence_payload = value.get("evidence", [])
+    if not isinstance(evidence_payload, list):
+        return _INVALID
+
+    evidence: list[ValidationEvidence] = []
+    for entry in evidence_payload:
+        parsed = _parse_validation_evidence(entry)
+        if parsed is _INVALID:
+            return _INVALID
+        evidence.append(parsed)
+
+    reasons = _parse_reason_list(value.get("reasons", []), field="validation.reasons")
+    if reasons is None:
+        return _INVALID
+
+    return ValidationResult(
+        status=status,
+        evidence=tuple(evidence),
+        reasons=reasons,
+    )
+
+
+def _parse_validation_evidence(value: object) -> ValidationEvidence | object:
+    if not isinstance(value, dict):
+        return _INVALID
+
+    kind = _parse_enum(value.get("kind"), ValidationEvidenceKind)
+    status = _parse_enum(value.get("status"), ValidationEvidenceStatus)
+    summary = _coerce_str(value.get("summary"))
+    source = value.get("source")
+    if kind is None or status is None or summary is None:
+        return _INVALID
+    if source is not None and not isinstance(source, str):
+        return _INVALID
+
+    return ValidationEvidence(
+        kind=kind,
+        status=status,
+        summary=summary,
+        source=source,
+    )
+
+
+def _parse_writeback_result(value: object) -> WritebackResult | None | object:
+    if value is None:
+        return None
+    if not isinstance(value, dict):
+        return _INVALID
+
+    destination = _parse_enum(value.get("destination"), WritebackDestination)
+    candidate_kind = _parse_optional_enum(value.get("candidate_kind"), WritebackCandidateKind)
+    should_write_back = value.get("should_write_back")
+    reasons = _parse_reason_list(value.get("reasons", []), field="writeback.reasons")
+    if destination is None or not isinstance(should_write_back, bool) or reasons is None:
+        return _INVALID
+
+    return WritebackResult(
+        destination=destination,
+        should_write_back=should_write_back,
+        reasons=reasons,
+        candidate_kind=candidate_kind,
+    )
+
+
+def _parse_followup_result(value: object) -> FollowupResult | None | object:
+    if value is None:
+        return None
+    if not isinstance(value, dict):
+        return _INVALID
+
+    action = _parse_enum(value.get("action"), FollowupAction)
+    explanation = _coerce_str(value.get("explanation"))
+    reasons = _parse_reason_list(value.get("reasons", []), field="followup.reasons")
+    if action is None or explanation is None or reasons is None:
+        return _INVALID
+
+    return FollowupResult(
+        action=action,
+        explanation=explanation,
+        reasons=reasons,
+    )
+
+
 def _parse_reason_list(value: object, *, field: str) -> tuple[RuntimeReason, ...] | None:
     if value is None:
         return ()
@@ -673,3 +851,21 @@ def _coerce_str(value: object) -> str | None:
     if not normalized:
         return None
     return normalized
+
+
+def _parse_enum(value: object, enum_type: type[Enum]) -> Enum | None:
+    if not isinstance(value, str):
+        return None
+    try:
+        return enum_type(value)
+    except ValueError:
+        return None
+
+
+def _parse_optional_enum(value: object, enum_type: type[Enum]) -> Enum | None | object:
+    if value is None:
+        return None
+    parsed = _parse_enum(value, enum_type)
+    if parsed is None:
+        return _INVALID
+    return parsed

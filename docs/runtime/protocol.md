@@ -182,6 +182,51 @@ The run-log replay slice also stays in the control plane:
 - if a requested summary artifact is missing or invalid, the runtime rebuilds it from the source run log
 - summary remains a derived review view over run logs, not a new authoritative workflow state source
 
+## Artifact-ref rules
+
+- runtime-generated control-plane artifacts use one narrow internal `ArtifactRef` shape:
+  - artifact kind
+  - repo-relative or absolute path
+- runtime-generated ref families currently include:
+  - run log
+  - run summary
+  - validation rollup
+  - write-back package
+  - follow-up package
+- artifact refs are linkage helpers for control-plane artifacts, not a general registry or new source of truth
+
+## Node-contract and gate rules
+
+- node contracts stay as static declarations rather than reflective registration
+- `node-gate` evaluates one declared node at a time against:
+  - available artifact refs
+  - available terminal signal kind
+  - current terminal status
+  - existence of the node's primary output artifact when declared
+- gate results are inspection-oriented only:
+  - `eligible`
+  - `blocked`
+  - `skipped`
+  - `not_applicable`
+  - `unknown`
+- gate evaluation is not a scheduler, planner, or automatic next-step selector
+
+## Validation-rollup rules
+
+- `validation-rollup` consumes one existing validation result and materializes one stable artifact under `.runtime/rollups/validation/<run-id>.json`
+- rollups keep a minimal decision-facing status set:
+  - `clean`
+  - `advisory`
+  - `blocking`
+- rollups normalize existing validation findings without re-running validation logic
+
+## Package-builder rules
+
+- `writeback-package` and `followup-package` materialize review artifacts under `.runtime/packages/`
+- packages link back to source run logs, summaries, and related artifact refs when that context is available
+- optional validation-rollup linkage is best-effort; package builders do not invent missing task correlation
+- packages are suggestion artifacts only and do not perform write-back, task creation, or dispatch automatically
+
 ## Write-back destination rules
 
 - `facts`
@@ -199,6 +244,5 @@ The run-log replay slice also stays in the control plane:
 ## Support level in this pass
 
 - fully supported: discovery and parsing for the canonical roadmap plan, task specs, facts, and skills
-- executable support: `plan-readiness-check`, `task-spec-readiness-check`, `plan` -> `task-spec`, `validation-collect`, `writeback-classifier`, `followup-suggester`, `executor-dispatch`, `result-log-replay`, `run-history-select`, and `run-summary`
-- internal normalized support: exact replay-backed history selection, compact replay-signal projection, and canonical terminal-state resolution
-- documented only for now: deeper validation result ingestion
+- executable support: `plan-readiness-check`, `task-spec-readiness-check`, `plan` -> `task-spec`, `validation-collect`, `writeback-classifier`, `followup-suggester`, `executor-dispatch`, `result-log-replay`, `run-history-select`, `run-summary`, `node-gate`, `validation-rollup`, `writeback-package`, and `followup-package`
+- internal normalized support: exact replay-backed history selection, compact replay-signal projection, canonical terminal-state resolution, artifact refs, static node contracts, and stable package artifacts
