@@ -42,6 +42,44 @@ LIST_FIELDS = frozenset(
     }
 )
 
+REQUIRED_TASK_SPEC_SECTIONS = (
+    "Metadata",
+    "Goal",
+    "In Scope",
+    "Out of Scope",
+    "Affected Area",
+    "Task Checklist",
+    "Done When",
+    "Validation",
+    "Write-back Needed",
+    "Risks / Notes",
+)
+
+TASK_SPEC_METADATA_FIELDS = (
+    "Source Plan / Request",
+    "Status",
+)
+
+TASK_SPEC_VALIDATION_FIELDS = (
+    "Black-box Checks",
+    "White-box Needed",
+    "White-box Trigger",
+    "Internal Logic To Protect",
+)
+
+TASK_SPEC_LIST_FIELDS = frozenset(
+    {
+        "In Scope",
+        "Out of Scope",
+        "Affected Area",
+        "Task Checklist",
+        "Black-box Checks",
+    }
+)
+
+ALLOWED_TASK_SPEC_STATUSES = frozenset({"draft", "in-progress", "blocked", "done"})
+EXECUTABLE_TASK_SPEC_STATUSES = frozenset({"draft", "in-progress"})
+
 _HEADING_RE = re.compile(r"^(#{2,6})\s+(.*?)\s*$")
 _BULLET_RE = re.compile(r"^[-*]\s+")
 _CHECKBOX_RE = re.compile(r"^[-*]\s+\[[ xX]\]\s+")
@@ -173,6 +211,34 @@ class TaskSpecDraft:
         return "\n".join(lines)
 
 
+@dataclass(frozen=True)
+class TaskSpecArtifact:
+    path: Path
+    title: str
+    sections: dict[str, str]
+    metadata: dict[str, str]
+    validation: dict[str, str]
+    raw_text: str = ""
+
+    @classmethod
+    def from_markdown(cls, path: Path, text: str) -> "TaskSpecArtifact":
+        sections = parse_markdown_sections(text, level=2)
+        metadata = parse_markdown_sections(sections.get("Metadata", ""), level=3)
+        validation = parse_markdown_sections(sections.get("Validation", ""), level=3)
+        return cls(
+            path=path.resolve(),
+            title=extract_markdown_title(text, fallback=path.stem.replace("-", " ").title()),
+            sections=sections,
+            metadata=metadata,
+            validation=validation,
+            raw_text=text,
+        )
+
+    @property
+    def status(self) -> str:
+        return normalize_inline_code(self.metadata.get("Status", ""))
+
+
 def discover_artifacts(repo_root: Path) -> list[ArtifactRef]:
     root = repo_root.resolve()
     artifacts: list[ArtifactRef] = []
@@ -264,6 +330,13 @@ def next_task_spec_path(specs_dir: Path, created_on: date, slug: str) -> Path:
 def slugify(value: str) -> str:
     slug = re.sub(r"[^a-z0-9]+", "-", value.lower()).strip("-")
     return slug or "task"
+
+
+def normalize_inline_code(text: str) -> str:
+    normalized = text.strip()
+    if normalized.startswith("`") and normalized.endswith("`") and len(normalized) >= 2:
+        return normalized[1:-1].strip()
+    return normalized
 
 
 def _discover_glob(directory: Path, pattern: str, kind: ArtifactKind) -> list[ArtifactRef]:

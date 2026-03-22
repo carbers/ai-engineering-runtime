@@ -6,7 +6,7 @@
 `docs/runtime/roadmap.md`
 
 ### Status
-`blocked`
+`done`
 
 ### Related Specs
 None.
@@ -42,7 +42,7 @@ Establish a real Phase 0 / Phase 1 foundation for `ai-engineering-runtime`: alig
 - [x] align the repository-facing docs and runtime design package with the runtime identity
 - [x] implement the `plan-to-spec` slice across protocol, state, engine, adapter, node, and CLI layers
 - [x] dogfood the roadmap into a real task spec and add focused `unittest` coverage for the slice
-- [ ] run the required black-box validation in a Python-enabled local environment
+- [x] run the required black-box validation in a Python-enabled local environment
 
 ## Done When
 A contributor can use `ae-runtime plan-to-spec --plan docs/runtime/roadmap.md` to compile this roadmap into a draft task spec and JSON run log, and the repository clearly reads as a lightweight runtime layered on top of the copied SOP starter.
@@ -72,4 +72,4 @@ Yes - keep `docs/facts/project-scope.md` aligned with the stable current phase a
 
 ## Risks / Notes
 - keep the parser limited to the documented heading-based contract
-- Blocked on explicit black-box validation because the current environment only exposes the WindowsApps `python.exe` alias and does not provide a usable Python interpreter
+- Black-box validation completed with Python 3.12.10 via `python -m unittest discover -s tests -v`, `python -m ai_engineering_runtime plan-to-spec --plan docs/runtime/roadmap.md --dry-run`, and a successful explicit-output `plan-to-spec` run

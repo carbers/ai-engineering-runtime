@@ -1,0 +1,15 @@
+{
+  "from_state": "planning",
+  "issues": [],
+  "log_path": ".runtime/runs/20260322T180645808422-plan-to-spec.json",
+  "metadata": {
+    "artifact_count": 11,
+    "dry_run": true
+  },
+  "node": "plan-to-spec",
+  "output_path": "docs/specs/20260322-002-runtime-plan-to-spec-foundation.md",
+  "plan_path": "docs/runtime/roadmap.md",
+  "rendered_output": null,
+  "success": true,
+  "to_state": "spec-ready"
+}

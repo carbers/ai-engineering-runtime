@@ -38,6 +38,42 @@ The current runtime slice implements the transitions below:
 - `planning` -> `blocked`
   happens when the plan readiness result is `blocked`, meaning required structure is missing or a contract field is invalid
 
+- `spec-ready` -> `spec-ready`
+  happens when a task spec readiness check is `ready` or `needs_clarification`, meaning the spec remains in review at the spec layer until a later dispatch step hands work to the worker plane
+
+- `spec-ready` -> `blocked`
+  happens when task-spec readiness is `blocked`, meaning required execution contract structure or status is invalid
+
+- `spec-ready` -> `spec-ready`
+  happens when executor dispatch runs in `preview` mode, meaning the handoff was prepared but not actually dispatched
+
+- `spec-ready` -> `executing`
+  happens when executor dispatch runs in `echo` mode for a ready task spec, meaning the control plane handed off the narrow payload to the local shell adapter
+
+- `spec-ready` -> `blocked`
+  happens when executor dispatch rejects a non-ready task spec
+
+- `validating` -> `writeback-review`
+  happens when validation collection returns `passed`, meaning required supplied validation evidence exists and no critical failures remain
+
+- `validating` -> `blocked`
+  happens when validation collection returns `failed` or `incomplete`, meaning required evidence failed or is still missing
+
+- `writeback-review` -> `writeback-review`
+  happens when the write-back classifier emits a destination decision for a closeout candidate. The runtime still requires explicit human-reviewed artifact updates before the workflow can move to `complete`.
+
+- `writeback-review` -> `planning`
+  happens when the follow-up suggester returns `clarify_plan`
+
+- `writeback-review` -> `blocked`
+  happens when the follow-up suggester returns `fix_validation_failure`
+
+- `writeback-review` -> `spec-ready`
+  happens when the follow-up suggester returns `implement_next_task`
+
+- `writeback-review` -> `complete`
+  happens when the follow-up suggester returns `no_followup_needed`
+
 ## Planned next transitions
 
 - `spec-ready` -> `executing`

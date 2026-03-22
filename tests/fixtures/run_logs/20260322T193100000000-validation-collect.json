@@ -1,0 +1,23 @@
+{
+  "from_state": "validating",
+  "issues": [],
+  "log_path": ".runtime/runs/20260322T193100000000-validation-collect.json",
+  "metadata": {},
+  "node": "validation-collect",
+  "output_path": null,
+  "plan_path": null,
+  "rendered_output": null,
+  "spec_path": "docs/specs/20260322-005-validation-collect-foundation.md",
+  "success": true,
+  "to_state": "writeback-review",
+  "validation": {
+    "reasons": [],
+    "status": "passed"
+  },
+  "writeback": {
+    "candidate_kind": "workflow_pattern",
+    "destination": "skills",
+    "reasons": [],
+    "should_write_back": true
+  }
+}

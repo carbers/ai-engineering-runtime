@@ -1,0 +1,512 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+from datetime import datetime
+from enum import Enum
+import json
+from pathlib import Path
+import re
+from typing import Any, Callable
+
+from ai_engineering_runtime.state import RuntimeReason
+
+_RUN_LOG_NAME_RE = re.compile(r"^(?P<timestamp>\d{8}T\d{12})-(?P<node>.+)\.json$")
+_REPLAY_SIGNAL_FIELDS = (
+    "readiness",
+    "validation",
+    "writeback",
+    "followup",
+    "dispatch",
+)
+
+
+class ReplayStatus(str, Enum):
+    REPLAYABLE = "replayable"
+    REJECTED = "rejected"
+
+
+class ArtifactTargetKind(str, Enum):
+    SPEC = "spec"
+    PLAN = "plan"
+    OUTPUT = "output"
+
+
+class ReplaySignalKind(str, Enum):
+    READINESS = "readiness"
+    VALIDATION = "validation"
+    WRITEBACK = "writeback"
+    FOLLOWUP = "followup"
+    DISPATCH = "dispatch"
+
+
+@dataclass(frozen=True)
+class ArtifactTarget:
+    kind: ArtifactTargetKind
+    path: str
+
+    def to_record(self) -> dict[str, str]:
+        return {
+            "kind": self.kind.value,
+            "path": self.path,
+        }
+
+
+@dataclass(frozen=True)
+class ReplayResult:
+    status: ReplayStatus
+    source_log_path: Path | None = None
+    ordered_at: datetime | None = None
+    node_name: str | None = None
+    artifact_target: ArtifactTarget | None = None
+    signal_kind: ReplaySignalKind | None = None
+    signal_value: str | None = None
+    reasons: tuple[RuntimeReason, ...] = ()
+
+    @property
+    def is_replayable(self) -> bool:
+        return self.status is ReplayStatus.REPLAYABLE
+
+    def to_record(self, display_path: Callable[[Path], str]) -> dict[str, object]:
+        return {
+            "status": self.status.value,
+            "source_log_path": display_path(self.source_log_path) if self.source_log_path is not None else None,
+            "ordered_at": self.ordered_at.isoformat() if self.ordered_at is not None else None,
+            "node": self.node_name,
+            "artifact_target": self.artifact_target.to_record() if self.artifact_target is not None else None,
+            "signal_kind": self.signal_kind.value if self.signal_kind is not None else None,
+            "signal_value": self.signal_value,
+            "reasons": [reason.to_record() for reason in self.reasons],
+        }
+
+
+@dataclass(frozen=True)
+class _SignalSpec:
+    field: str
+    kind: ReplaySignalKind
+    value_key: str
+
+
+_SUPPORTED_SIGNAL_SPECS: dict[str, _SignalSpec] = {
+    "plan-readiness-check": _SignalSpec("readiness", ReplaySignalKind.READINESS, "status"),
+    "task-spec-readiness-check": _SignalSpec("readiness", ReplaySignalKind.READINESS, "status"),
+    "validation-collect": _SignalSpec("validation", ReplaySignalKind.VALIDATION, "status"),
+    "writeback-classifier": _SignalSpec("writeback", ReplaySignalKind.WRITEBACK, "destination"),
+    "followup-suggester": _SignalSpec("followup", ReplaySignalKind.FOLLOWUP, "action"),
+    "executor-dispatch": _SignalSpec("dispatch", ReplaySignalKind.DISPATCH, "status"),
+}
+
+
+def discover_run_logs(repo_root: Path, *, node_name: str | None = None) -> list[Path]:
+    run_dir = repo_root.resolve() / ".runtime" / "runs"
+    if not run_dir.exists():
+        return []
+
+    ordered: list[tuple[datetime, Path]] = []
+    for path in run_dir.glob("*.json"):
+        parsed = _parse_run_log_name(path.name)
+        if parsed is None:
+            continue
+        ordered_at, parsed_node = parsed
+        if node_name is not None and parsed_node != node_name:
+            continue
+        if node_name is None and parsed_node == "result-log-replay":
+            continue
+        ordered.append((ordered_at, path.resolve()))
+
+    ordered.sort(key=lambda item: (item[0], item[1].name))
+    return [path for _, path in ordered]
+
+
+def select_latest_run_log(repo_root: Path, *, node_name: str | None = None) -> Path | None:
+    discovered = discover_run_logs(repo_root, node_name=node_name)
+    if not discovered:
+        return None
+    return discovered[-1]
+
+
+def load_replay_result(log_path: Path) -> ReplayResult:
+    resolved_log_path = log_path.resolve()
+    if not resolved_log_path.exists():
+        return ReplayResult(
+            status=ReplayStatus.REJECTED,
+            source_log_path=resolved_log_path,
+            reasons=(
+                RuntimeReason(
+                    code="missing-run-log",
+                    message=f"Run log not found: {resolved_log_path.as_posix()}",
+                    field="log_path",
+                ),
+            ),
+        )
+
+    parsed_name = _parse_run_log_name(resolved_log_path.name)
+    if parsed_name is None:
+        return ReplayResult(
+            status=ReplayStatus.REJECTED,
+            source_log_path=resolved_log_path,
+            node_name=_fallback_node_name(resolved_log_path.name),
+            reasons=(
+                RuntimeReason(
+                    code="invalid-run-log-filename-timestamp",
+                    message=f"Run log filename does not contain a valid ordering timestamp: {resolved_log_path.name}",
+                    field="log_path",
+                ),
+            ),
+        )
+
+    ordered_at, fallback_node = parsed_name
+    try:
+        payload = json.loads(resolved_log_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return ReplayResult(
+            status=ReplayStatus.REJECTED,
+            source_log_path=resolved_log_path,
+            ordered_at=ordered_at,
+            node_name=fallback_node,
+            reasons=(
+                RuntimeReason(
+                    code="malformed-run-log-json",
+                    message=f"Run log is not valid JSON: {resolved_log_path.name}",
+                    field="log_path",
+                ),
+            ),
+        )
+
+    if not isinstance(payload, dict):
+        return ReplayResult(
+            status=ReplayStatus.REJECTED,
+            source_log_path=resolved_log_path,
+            ordered_at=ordered_at,
+            node_name=fallback_node,
+            reasons=(
+                RuntimeReason(
+                    code="invalid-run-log-envelope",
+                    message="Run log root payload must be a JSON object.",
+                    field="payload",
+                ),
+            ),
+        )
+
+    issues = _parse_reason_list(payload.get("issues"), field="issues")
+    if issues is None:
+        return ReplayResult(
+            status=ReplayStatus.REJECTED,
+            source_log_path=resolved_log_path,
+            ordered_at=ordered_at,
+            node_name=_coerce_str(payload.get("node")) or fallback_node,
+            reasons=(
+                RuntimeReason(
+                    code="invalid-run-log-envelope",
+                    message="Run log issues must be a list of structured reasons.",
+                    field="issues",
+                ),
+            ),
+        )
+
+    envelope_errors = _validate_run_log_envelope(payload)
+    if envelope_errors:
+        return ReplayResult(
+            status=ReplayStatus.REJECTED,
+            source_log_path=resolved_log_path,
+            ordered_at=ordered_at,
+            node_name=_coerce_str(payload.get("node")) or fallback_node,
+            reasons=_dedupe_reasons((*envelope_errors, *issues)),
+        )
+
+    node_name = str(payload["node"])
+    artifact_target = _resolve_artifact_target(payload)
+    present_signal_fields = [field for field in _REPLAY_SIGNAL_FIELDS if payload.get(field) is not None]
+
+    if len(present_signal_fields) > 1:
+        return ReplayResult(
+            status=ReplayStatus.REJECTED,
+            source_log_path=resolved_log_path,
+            ordered_at=ordered_at,
+            node_name=node_name,
+            artifact_target=artifact_target,
+            reasons=_dedupe_reasons(
+                (
+                    RuntimeReason(
+                        code="ambiguous-replayable-signal",
+                        message="Run log contains multiple replayable signal sections.",
+                    ),
+                    *issues,
+                )
+            ),
+        )
+
+    signal_spec = _SUPPORTED_SIGNAL_SPECS.get(node_name)
+    if signal_spec is None:
+        rejection_code = "missing-replayable-signal" if node_name == "plan-to-spec" else "unknown-run-log-node"
+        rejection_message = (
+            "Run log does not expose a stable replayable signal in this slice."
+            if node_name == "plan-to-spec"
+            else f"Run log node is not supported for replay: {node_name}"
+        )
+        return ReplayResult(
+            status=ReplayStatus.REJECTED,
+            source_log_path=resolved_log_path,
+            ordered_at=ordered_at,
+            node_name=node_name,
+            artifact_target=artifact_target,
+            reasons=_dedupe_reasons(
+                (
+                    RuntimeReason(code=rejection_code, message=rejection_message, field="node"),
+                    *issues,
+                )
+            ),
+        )
+
+    if present_signal_fields and present_signal_fields[0] != signal_spec.field:
+        return ReplayResult(
+            status=ReplayStatus.REJECTED,
+            source_log_path=resolved_log_path,
+            ordered_at=ordered_at,
+            node_name=node_name,
+            artifact_target=artifact_target,
+            reasons=_dedupe_reasons(
+                (
+                    RuntimeReason(
+                        code="ambiguous-replayable-signal",
+                        message="Run log signal payload does not match the recorded node identity.",
+                        field=signal_spec.field,
+                    ),
+                    *issues,
+                )
+            ),
+        )
+
+    signal_payload = payload.get(signal_spec.field)
+    if signal_payload is None:
+        return ReplayResult(
+            status=ReplayStatus.REJECTED,
+            source_log_path=resolved_log_path,
+            ordered_at=ordered_at,
+            node_name=node_name,
+            artifact_target=artifact_target,
+            reasons=_dedupe_reasons(
+                (
+                    RuntimeReason(
+                        code="missing-replayable-signal",
+                        message=f"Run log does not include a replayable {signal_spec.field} payload.",
+                        field=signal_spec.field,
+                    ),
+                    *issues,
+                )
+            ),
+        )
+
+    if not isinstance(signal_payload, dict):
+        return ReplayResult(
+            status=ReplayStatus.REJECTED,
+            source_log_path=resolved_log_path,
+            ordered_at=ordered_at,
+            node_name=node_name,
+            artifact_target=artifact_target,
+            reasons=_dedupe_reasons(
+                (
+                    RuntimeReason(
+                        code="invalid-run-log-envelope",
+                        message=f"Run log {signal_spec.field} payload must be a JSON object.",
+                        field=signal_spec.field,
+                    ),
+                    *issues,
+                )
+            ),
+        )
+
+    typed_reasons = _parse_reason_list(signal_payload.get("reasons", []), field=f"{signal_spec.field}.reasons")
+    if typed_reasons is None:
+        return ReplayResult(
+            status=ReplayStatus.REJECTED,
+            source_log_path=resolved_log_path,
+            ordered_at=ordered_at,
+            node_name=node_name,
+            artifact_target=artifact_target,
+            reasons=_dedupe_reasons(
+                (
+                    RuntimeReason(
+                        code="invalid-run-log-envelope",
+                        message=f"Run log {signal_spec.field} reasons must be a list of structured reasons.",
+                        field=f"{signal_spec.field}.reasons",
+                    ),
+                    *issues,
+                )
+            ),
+        )
+
+    signal_value = _coerce_str(signal_payload.get(signal_spec.value_key))
+    if signal_value is None:
+        return ReplayResult(
+            status=ReplayStatus.REJECTED,
+            source_log_path=resolved_log_path,
+            ordered_at=ordered_at,
+            node_name=node_name,
+            artifact_target=artifact_target,
+            reasons=_dedupe_reasons(
+                (
+                    RuntimeReason(
+                        code="missing-replayable-signal",
+                        message=f"Run log {signal_spec.field} payload is missing {signal_spec.value_key}.",
+                        field=f"{signal_spec.field}.{signal_spec.value_key}",
+                    ),
+                    *typed_reasons,
+                    *issues,
+                )
+            ),
+        )
+
+    return ReplayResult(
+        status=ReplayStatus.REPLAYABLE,
+        source_log_path=resolved_log_path,
+        ordered_at=ordered_at,
+        node_name=node_name,
+        artifact_target=artifact_target,
+        signal_kind=signal_spec.kind,
+        signal_value=signal_value,
+        reasons=_dedupe_reasons((*typed_reasons, *issues)),
+    )
+
+
+def missing_selection_result(*, node_name: str | None = None) -> ReplayResult:
+    message = (
+        f"No run logs found under .runtime/runs/ for node: {node_name}"
+        if node_name
+        else "No run logs found under .runtime/runs/."
+    )
+    return ReplayResult(
+        status=ReplayStatus.REJECTED,
+        node_name=node_name,
+        reasons=(
+            RuntimeReason(
+                code="missing-run-log-selection",
+                message=message,
+                field="log_path",
+            ),
+        ),
+    )
+
+
+def _parse_run_log_name(name: str) -> tuple[datetime, str] | None:
+    match = _RUN_LOG_NAME_RE.match(name)
+    if match is None:
+        return None
+
+    try:
+        ordered_at = datetime.strptime(match.group("timestamp"), "%Y%m%dT%H%M%S%f")
+    except ValueError:
+        return None
+    return ordered_at, match.group("node")
+
+
+def _fallback_node_name(name: str) -> str | None:
+    stem = Path(name).stem
+    if "-" not in stem:
+        return None
+    _, node_name = stem.split("-", 1)
+    return node_name or None
+
+
+def _validate_run_log_envelope(payload: dict[str, Any]) -> tuple[RuntimeReason, ...]:
+    errors: list[RuntimeReason] = []
+
+    if not isinstance(payload.get("node"), str) or not payload["node"].strip():
+        errors.append(
+            RuntimeReason(
+                code="invalid-run-log-envelope",
+                message="Run log must include a non-empty node name.",
+                field="node",
+            )
+        )
+    if not isinstance(payload.get("success"), bool):
+        errors.append(
+            RuntimeReason(
+                code="invalid-run-log-envelope",
+                message="Run log must include a boolean success field.",
+                field="success",
+            )
+        )
+    for field in ("from_state", "to_state"):
+        if not isinstance(payload.get(field), str) or not str(payload[field]).strip():
+            errors.append(
+                RuntimeReason(
+                    code="invalid-run-log-envelope",
+                    message=f"Run log must include a non-empty {field} field.",
+                    field=field,
+                )
+            )
+
+    for field in ("plan_path", "spec_path", "output_path", "log_path", "rendered_output"):
+        value = payload.get(field)
+        if value is not None and not isinstance(value, str):
+            errors.append(
+                RuntimeReason(
+                    code="invalid-run-log-envelope",
+                    message=f"Run log field must be a string or null: {field}",
+                    field=field,
+                )
+            )
+
+    metadata = payload.get("metadata")
+    if metadata is not None and not isinstance(metadata, dict):
+        errors.append(
+            RuntimeReason(
+                code="invalid-run-log-envelope",
+                message="Run log metadata must be a JSON object when present.",
+                field="metadata",
+            )
+        )
+
+    return tuple(errors)
+
+
+def _resolve_artifact_target(payload: dict[str, Any]) -> ArtifactTarget | None:
+    if _coerce_str(payload.get("spec_path")) is not None:
+        return ArtifactTarget(ArtifactTargetKind.SPEC, str(payload["spec_path"]))
+    if _coerce_str(payload.get("plan_path")) is not None:
+        return ArtifactTarget(ArtifactTargetKind.PLAN, str(payload["plan_path"]))
+    if _coerce_str(payload.get("output_path")) is not None:
+        return ArtifactTarget(ArtifactTargetKind.OUTPUT, str(payload["output_path"]))
+    return None
+
+
+def _parse_reason_list(value: object, *, field: str) -> tuple[RuntimeReason, ...] | None:
+    if value is None:
+        return ()
+    if not isinstance(value, list):
+        return None
+
+    reasons: list[RuntimeReason] = []
+    for item in value:
+        if not isinstance(item, dict):
+            return None
+        code = _coerce_str(item.get("code"))
+        message = _coerce_str(item.get("message"))
+        field_name = item.get("field")
+        if code is None or message is None:
+            return None
+        if field_name is not None and not isinstance(field_name, str):
+            return None
+        reasons.append(RuntimeReason(code=code, message=message, field=field_name))
+    return tuple(reasons)
+
+
+def _dedupe_reasons(reasons: tuple[RuntimeReason, ...] | list[RuntimeReason]) -> tuple[RuntimeReason, ...]:
+    deduped: list[RuntimeReason] = []
+    seen: set[tuple[str, str, str | None]] = set()
+    for reason in reasons:
+        identity = (reason.code, reason.message, reason.field)
+        if identity in seen:
+            continue
+        seen.add(identity)
+        deduped.append(reason)
+    return tuple(deduped)
+
+
+def _coerce_str(value: object) -> str | None:
+    if not isinstance(value, str):
+        return None
+    normalized = value.strip()
+    if not normalized:
+        return None
+    return normalized

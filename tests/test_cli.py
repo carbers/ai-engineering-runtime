@@ -4,6 +4,7 @@ from contextlib import redirect_stderr, redirect_stdout
 from datetime import date
 import io
 from pathlib import Path
+import shutil
 import sys
 import tempfile
 import textwrap
@@ -11,6 +12,7 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "src"
+RUN_LOG_FIXTURES = ROOT / "tests" / "fixtures" / "run_logs"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
@@ -90,6 +92,12 @@ def _write_repo_file(root: Path, relative_path: str, content: str) -> None:
     path.write_text(textwrap.dedent(content).strip() + "\n", encoding="utf-8")
 
 
+def _copy_run_log_fixture(root: Path, fixture_name: str) -> None:
+    destination = root / ".runtime" / "runs" / fixture_name
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(RUN_LOG_FIXTURES / fixture_name, destination)
+
+
 class CliTests(unittest.TestCase):
     def test_plan_readiness_check_reports_ready(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -134,6 +142,262 @@ class CliTests(unittest.TestCase):
             self.assertIn("plan-readiness-check failed", stderr.getvalue())
             self.assertIn("Readiness: needs_clarification", stderr.getvalue())
             self.assertIn("placeholder-first-slice-field", stderr.getvalue())
+
+    def test_task_spec_readiness_check_reports_ready(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            task_spec = """
+            # Sample Task Spec
+
+            ## Metadata
+
+            ### Source Plan / Request
+            `docs/runtime/roadmap.md`
+
+            ### Status
+            `draft`
+
+            ### Related Specs
+            None.
+
+            ## Goal
+            Implement a narrow runtime slice.
+
+            ## In Scope
+            - add a readiness checker
+
+            ## Out of Scope
+            - executor dispatch
+
+            ## Affected Area
+            - `src/ai_engineering_runtime/*`
+
+            ## Task Checklist
+            - [ ] add the checker
+
+            ## Done When
+            The checker reports task-spec readiness.
+
+            ## Validation
+
+            ### Black-box Checks
+            - checker returns ready
+
+            ### White-box Needed
+            Yes
+
+            ### White-box Trigger
+            The parser is contract-sensitive.
+
+            ### Internal Logic To Protect
+            - status mapping
+
+            ## Write-back Needed
+            No
+
+            ## Risks / Notes
+            - keep it small
+            """
+            _write_repo_file(root, "docs/specs/20260322-999-sample.md", task_spec)
+
+            stdout = io.StringIO()
+            stderr = io.StringIO()
+            with redirect_stdout(stdout), redirect_stderr(stderr):
+                exit_code = main(
+                    ["task-spec-readiness-check", "--spec", "docs/specs/20260322-999-sample.md"],
+                    repo_root=root,
+                    today=date(2026, 3, 22),
+                )
+
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(stderr.getvalue(), "")
+            self.assertIn("task-spec-readiness-check completed", stdout.getvalue())
+            self.assertIn("Spec: docs/specs/20260322-999-sample.md", stdout.getvalue())
+            self.assertIn("Readiness: ready", stdout.getvalue())
+
+    def test_validation_collect_reports_passed(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            task_spec = """
+            # Validation Sample
+
+            ## Metadata
+
+            ### Source Plan / Request
+            `docs/runtime/roadmap.md`
+
+            ### Status
+            `done`
+
+            ### Related Specs
+            None.
+
+            ## Goal
+            Close out a runtime slice.
+
+            ## In Scope
+            - collect validation
+
+            ## Out of Scope
+            - follow-up generation
+
+            ## Affected Area
+            - `src/ai_engineering_runtime/*`
+
+            ## Task Checklist
+            - [x] collect evidence
+
+            ## Done When
+            Validation is aggregated cleanly.
+
+            ## Validation
+
+            ### Black-box Checks
+            - validation returns passed
+
+            ### White-box Needed
+            Yes
+
+            ### White-box Trigger
+            The collector is branch-sensitive.
+
+            ### Internal Logic To Protect
+            - status derivation
+
+            ## Write-back Needed
+            No
+
+            ## Risks / Notes
+            - keep it small
+            """
+            _write_repo_file(root, "docs/specs/20260322-999-validation.md", task_spec)
+
+            stdout = io.StringIO()
+            stderr = io.StringIO()
+            with redirect_stdout(stdout), redirect_stderr(stderr):
+                exit_code = main(
+                    [
+                        "validation-collect",
+                        "--spec",
+                        "docs/specs/20260322-999-validation.md",
+                        "--command-status",
+                        "passed",
+                        "--black-box-status",
+                        "passed",
+                        "--white-box-status",
+                        "passed",
+                    ],
+                    repo_root=root,
+                    today=date(2026, 3, 22),
+                )
+
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(stderr.getvalue(), "")
+            self.assertIn("validation-collect completed", stdout.getvalue())
+            self.assertIn("Validation: passed", stdout.getvalue())
+            self.assertIn("State: writeback-review", stdout.getvalue())
+
+    def test_followup_suggester_reports_fix_validation_failure(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+
+            stdout = io.StringIO()
+            stderr = io.StringIO()
+            with redirect_stdout(stdout), redirect_stderr(stderr):
+                exit_code = main(
+                    [
+                        "followup-suggester",
+                        "--validation-status",
+                        "failed",
+                    ],
+                    repo_root=root,
+                    today=date(2026, 3, 22),
+                )
+
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(stderr.getvalue(), "")
+            self.assertIn("followup-suggester completed", stdout.getvalue())
+            self.assertIn("Follow-up: fix_validation_failure", stdout.getvalue())
+            self.assertIn("Why: Prioritize a fix-oriented task before moving on.", stdout.getvalue())
+
+    def test_executor_dispatch_reports_preview_for_ready_task_spec(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            task_spec = """
+            # Dispatch Sample
+
+            ## Metadata
+
+            ### Source Plan / Request
+            `docs/runtime/roadmap.md`
+
+            ### Status
+            `in-progress`
+
+            ### Related Specs
+            None.
+
+            ## Goal
+            Hand off a narrow task safely.
+
+            ## In Scope
+            - prepare a handoff payload
+
+            ## Out of Scope
+            - deep executor integration
+
+            ## Affected Area
+            - `src/ai_engineering_runtime/*`
+
+            ## Task Checklist
+            - [ ] prepare the handoff
+
+            ## Done When
+            The control plane can preview a handoff.
+
+            ## Validation
+
+            ### Black-box Checks
+            - ready spec can dispatch
+
+            ### White-box Needed
+            Yes
+
+            ### White-box Trigger
+            The handoff gate is contract-sensitive.
+
+            ### Internal Logic To Protect
+            - readiness gating
+
+            ## Write-back Needed
+            No
+
+            ## Risks / Notes
+            - keep it small
+            """
+            _write_repo_file(root, "docs/specs/20260322-999-dispatch.md", task_spec)
+
+            stdout = io.StringIO()
+            stderr = io.StringIO()
+            with redirect_stdout(stdout), redirect_stderr(stderr):
+                exit_code = main(
+                    [
+                        "executor-dispatch",
+                        "--spec",
+                        "docs/specs/20260322-999-dispatch.md",
+                        "--mode",
+                        "preview",
+                    ],
+                    repo_root=root,
+                    today=date(2026, 3, 22),
+                )
+
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(stderr.getvalue(), "")
+            self.assertIn("executor-dispatch completed", stdout.getvalue())
+            self.assertIn("Dispatch: previewed", stdout.getvalue())
+            self.assertIn("Executor: shell", stdout.getvalue())
+            self.assertIn("Mode: preview", stdout.getvalue())
 
     def test_main_reports_success_and_writes_spec(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -200,6 +464,81 @@ class CliTests(unittest.TestCase):
             self.assertIn("plan-to-spec failed", stderr.getvalue())
             self.assertIn("Readiness: blocked", stderr.getvalue())
             self.assertIn("Missing required First Slice field: Done When", stderr.getvalue())
+
+    def test_writeback_classifier_reports_destination_and_reason(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+
+            stdout = io.StringIO()
+            stderr = io.StringIO()
+            with redirect_stdout(stdout), redirect_stderr(stderr):
+                exit_code = main(
+                    [
+                        "writeback-classifier",
+                        "--text",
+                        "This repeatable workflow checklist should be reused later.",
+                        "--kind",
+                        "workflow_pattern",
+                    ],
+                    repo_root=root,
+                    today=date(2026, 3, 22),
+                )
+
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(stderr.getvalue(), "")
+            self.assertIn("writeback-classifier completed", stdout.getvalue())
+            self.assertIn("Write-back: skills", stdout.getvalue())
+            self.assertIn("Eligible: yes", stdout.getvalue())
+            self.assertIn("reusable-workflow-pattern", stdout.getvalue())
+
+    def test_result_log_replay_reports_replayable_validation_signal(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            _copy_run_log_fixture(root, "20260322T191755447854-validation-collect.json")
+
+            stdout = io.StringIO()
+            stderr = io.StringIO()
+            with redirect_stdout(stdout), redirect_stderr(stderr):
+                exit_code = main(
+                    [
+                        "result-log-replay",
+                        "--log",
+                        ".runtime/runs/20260322T191755447854-validation-collect.json",
+                    ],
+                    repo_root=root,
+                    today=date(2026, 3, 22),
+                )
+
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(stderr.getvalue(), "")
+            self.assertIn("result-log-replay completed", stdout.getvalue())
+            self.assertIn("Replay: replayable", stdout.getvalue())
+            self.assertIn("Replayed Node: validation-collect", stdout.getvalue())
+            self.assertIn("Signal: validation=passed", stdout.getvalue())
+
+    def test_result_log_replay_reports_rejected_malformed_log(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            _copy_run_log_fixture(root, "20260322T193000000000-malformed.json")
+
+            stdout = io.StringIO()
+            stderr = io.StringIO()
+            with redirect_stdout(stdout), redirect_stderr(stderr):
+                exit_code = main(
+                    [
+                        "result-log-replay",
+                        "--log",
+                        ".runtime/runs/20260322T193000000000-malformed.json",
+                    ],
+                    repo_root=root,
+                    today=date(2026, 3, 22),
+                )
+
+            self.assertEqual(exit_code, 1)
+            self.assertEqual(stdout.getvalue(), "")
+            self.assertIn("result-log-replay failed", stderr.getvalue())
+            self.assertIn("Replay: rejected", stderr.getvalue())
+            self.assertIn("malformed-run-log-json", stderr.getvalue())
 
 
 if __name__ == "__main__":

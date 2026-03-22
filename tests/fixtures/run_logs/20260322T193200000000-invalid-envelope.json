@@ -1,0 +1,11 @@
+{
+  "from_state": "validating",
+  "issues": [],
+  "log_path": ".runtime/runs/20260322T193200000000-invalid-envelope.json",
+  "metadata": [],
+  "output_path": null,
+  "plan_path": null,
+  "rendered_output": null,
+  "success": "yes",
+  "to_state": "writeback-review"
+}

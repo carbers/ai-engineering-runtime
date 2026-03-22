@@ -15,6 +15,7 @@ if str(SRC) not in sys.path:
 from ai_engineering_runtime.artifacts import (  # noqa: E402
     ArtifactKind,
     PlanArtifact,
+    TaskSpecArtifact,
     discover_artifacts,
     next_task_spec_path,
 )
@@ -116,6 +117,69 @@ class ArtifactProtocolTests(unittest.TestCase):
             self.assertIn((ArtifactKind.TASK_SPEC, "20260322-001-sample.md"), kinds)
             self.assertIn((ArtifactKind.FACT, "project-scope.md"), kinds)
             self.assertIn((ArtifactKind.SKILL, "plan-to-spec.md"), kinds)
+
+    def test_task_spec_artifact_parses_metadata_and_validation_sections(self) -> None:
+        task_spec = TaskSpecArtifact.from_markdown(
+            Path("docs/specs/20260322-999-sample.md"),
+            textwrap.dedent(
+                """
+                # Sample Task Spec
+
+                ## Metadata
+
+                ### Source Plan / Request
+                `docs/runtime/roadmap.md`
+
+                ### Status
+                `draft`
+
+                ### Related Specs
+                None.
+
+                ## Goal
+                Ship a narrow runtime slice.
+
+                ## In Scope
+                - add a node
+
+                ## Out of Scope
+                - add a dashboard
+
+                ## Affected Area
+                - `src/ai_engineering_runtime/*`
+
+                ## Task Checklist
+                - [ ] add the node
+
+                ## Done When
+                The node runs.
+
+                ## Validation
+
+                ### Black-box Checks
+                - command succeeds
+
+                ### White-box Needed
+                Yes
+
+                ### White-box Trigger
+                The parser is stateful.
+
+                ### Internal Logic To Protect
+                - state transitions
+
+                ## Write-back Needed
+                No
+
+                ## Risks / Notes
+                - keep it small
+                """
+            ),
+        )
+
+        self.assertEqual(task_spec.metadata["Source Plan / Request"], "`docs/runtime/roadmap.md`")
+        self.assertEqual(task_spec.status, "draft")
+        self.assertEqual(task_spec.validation["White-box Needed"], "Yes")
 
     def test_next_task_spec_path_skips_existing_same_day_sequences(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

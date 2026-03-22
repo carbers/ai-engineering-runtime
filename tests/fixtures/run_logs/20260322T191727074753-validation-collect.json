@@ -1,0 +1,43 @@
+{
+  "from_state": "validating",
+  "issues": [
+    {
+      "code": "missing-white-box-evidence",
+      "message": "Missing required white-box evidence."
+    }
+  ],
+  "log_path": ".runtime/runs/20260322T191727074753-validation-collect.json",
+  "metadata": {},
+  "node": "validation-collect",
+  "output_path": null,
+  "plan_path": null,
+  "readiness": null,
+  "rendered_output": null,
+  "spec_path": "docs/specs/20260322-005-validation-collect-foundation.md",
+  "success": false,
+  "to_state": "blocked",
+  "validation": {
+    "evidence": [
+      {
+        "kind": "command",
+        "source": "docs/specs/20260322-005-validation-collect-foundation.md",
+        "status": "passed",
+        "summary": "Command evidence reported."
+      },
+      {
+        "kind": "black_box",
+        "source": "docs/specs/20260322-005-validation-collect-foundation.md",
+        "status": "passed",
+        "summary": "Black-box validation evidence reported."
+      }
+    ],
+    "reasons": [
+      {
+        "code": "missing-white-box-evidence",
+        "message": "Missing required white-box evidence."
+      }
+    ],
+    "status": "incomplete"
+  },
+  "writeback": null
+}

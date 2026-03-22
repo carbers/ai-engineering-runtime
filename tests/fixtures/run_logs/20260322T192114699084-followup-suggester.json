@@ -1,0 +1,31 @@
+{
+  "followup": {
+    "action": "fix_validation_failure",
+    "explanation": "Prioritize a fix-oriented task before moving on.",
+    "reasons": [
+      {
+        "code": "validation-failed",
+        "message": "Validation failed and needs a fix-oriented next task."
+      }
+    ]
+  },
+  "from_state": "writeback-review",
+  "issues": [
+    {
+      "code": "validation-failed",
+      "message": "Validation failed and needs a fix-oriented next task."
+    }
+  ],
+  "log_path": ".runtime/runs/20260322T192114699084-followup-suggester.json",
+  "metadata": {},
+  "node": "followup-suggester",
+  "output_path": null,
+  "plan_path": null,
+  "readiness": null,
+  "rendered_output": null,
+  "spec_path": null,
+  "success": true,
+  "to_state": "blocked",
+  "validation": null,
+  "writeback": null
+}

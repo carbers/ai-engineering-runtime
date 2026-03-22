@@ -15,7 +15,7 @@ This repository establishes a practical runtime layer that can:
 5. collect validation results
 6. suggest write-back and follow-up work
 
-The current implementation is intentionally smaller than that full direction: one stdlib-only Python CLI, two real nodes, and one documented contract for checking plan readiness and compiling a plan into a narrow draft task spec.
+The current implementation is intentionally smaller than that full direction: one stdlib-only Python CLI, eight real nodes, and one documented contract for checking plan readiness, checking task-spec readiness, compiling a plan into a narrow draft task spec, aggregating validation evidence, classifying closeout write-back candidates, suggesting the next control-plane action, preparing a minimal shell-based executor handoff, and reconstructing replay-friendly outcomes from prior run logs.
 
 ## What stays the same
 
@@ -59,7 +59,13 @@ The current executable slice is:
 
 ```text
 ae-runtime plan-readiness-check --plan docs/runtime/roadmap.md
+ae-runtime task-spec-readiness-check --spec docs/specs/20260322-003-writeback-classifier.md
 ae-runtime plan-to-spec --plan docs/runtime/roadmap.md
+ae-runtime validation-collect --spec docs/specs/20260322-003-writeback-classifier.md --command-status passed --black-box-status passed
+ae-runtime writeback-classifier --text "..." --kind workflow_pattern
+ae-runtime followup-suggester --validation-status failed
+ae-runtime executor-dispatch --spec docs/specs/20260322-007-executor-dispatch-adapter-shell.md --mode preview
+ae-runtime result-log-replay --latest --node validation-collect
 ```
 
 Use `plan-readiness-check` to inspect a plan artifact and return a structured readiness outcome with stable reason codes.
@@ -71,8 +77,14 @@ These commands currently:
 
 - parse a roadmap or plan artifact from Markdown
 - classify plan readiness as `ready`, `needs_clarification`, or `blocked`
+- classify task-spec readiness as `ready`, `needs_clarification`, or `blocked`
 - return stable reason codes and messages for non-ready outcomes
 - render a narrow draft task spec only when readiness is `ready`
+- aggregate supplied validation evidence as `passed`, `failed`, or `incomplete`
+- classify write-back candidates as `facts`, `skills`, `change_summary_only`, or `ignore`
+- suggest a single next control-plane action from readiness, validation, write-back, and closeout signals
+- prepare or exercise a minimal shell-based dispatch handoff for ready task specs
+- inspect one prior run log at a time and normalize its recorded signal as replay-oriented context
 - write a JSON run log under `.runtime/runs/`
 
 ## What this repository is not

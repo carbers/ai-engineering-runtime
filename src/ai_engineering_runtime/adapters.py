@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import datetime
 import json
+import os
 from pathlib import Path
+import shlex
+import subprocess
 
 
 class FileSystemAdapter:
@@ -40,3 +44,40 @@ class FileSystemAdapter:
         log_path = self.build_run_log_path(node_name)
         self.write_json(log_path, payload)
         return log_path
+
+
+@dataclass(frozen=True)
+class ShellDispatchReceipt:
+    command: tuple[str, ...]
+    returncode: int
+    stdout: str
+    stderr: str
+
+
+class ShellExecutorAdapter:
+    def dispatch_echo(self, text: str) -> ShellDispatchReceipt:
+        safe_text = self._sanitize_echo_text(text)
+        command = self._build_echo_command(safe_text)
+        completed = subprocess.run(
+            list(command),
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        return ShellDispatchReceipt(
+            command=command,
+            returncode=completed.returncode,
+            stdout=completed.stdout,
+            stderr=completed.stderr,
+        )
+
+    def _build_echo_command(self, text: str) -> tuple[str, ...]:
+        if os.name == "nt":
+            return ("cmd", "/c", "echo", text)
+        return ("sh", "-lc", f"printf '%s\\n' {shlex.quote(text)}")
+
+    def _sanitize_echo_text(self, text: str) -> str:
+        cleaned = " ".join(text.splitlines()).strip()
+        for char in "&|<>^":
+            cleaned = cleaned.replace(char, " ")
+        return cleaned or "ae-runtime dispatch"

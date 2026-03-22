@@ -1,0 +1,26 @@
+{
+  "from_state": "writeback-review",
+  "issues": [],
+  "log_path": ".runtime/runs/20260322T190929590964-writeback-classifier.json",
+  "metadata": {
+    "text_length": 58
+  },
+  "node": "writeback-classifier",
+  "output_path": null,
+  "plan_path": null,
+  "readiness": null,
+  "rendered_output": null,
+  "success": true,
+  "to_state": "writeback-review",
+  "writeback": {
+    "candidate_kind": "workflow_pattern",
+    "destination": "skills",
+    "reasons": [
+      {
+        "code": "reusable-workflow-pattern",
+        "message": "Candidate captures a repeatable workflow pattern suited for skills."
+      }
+    ],
+    "should_write_back": true
+  }
+}
