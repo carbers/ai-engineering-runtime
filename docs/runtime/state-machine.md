@@ -27,13 +27,16 @@ The runtime models workflow state at the level of durable artifacts and narrow e
 
 ## Current implemented transition
 
-The first runtime slice implements only the transition below:
+The current runtime slice implements the transitions below:
 
 - `planning` -> `spec-ready`
-  happens when the plan contains all required `##` sections and all required `###` `First Slice` contract fields
+  happens when the plan readiness result is `ready`
+
+- `planning` -> `planning`
+  happens when the plan readiness result is `needs_clarification`, meaning the structure is valid but targeted clarification is still required before safe spec creation
 
 - `planning` -> `blocked`
-  happens when any required section or contract field is missing or invalid
+  happens when the plan readiness result is `blocked`, meaning required structure is missing or a contract field is invalid
 
 ## Planned next transitions
 
@@ -55,6 +58,7 @@ The first runtime slice implements only the transition below:
 ## Gate conditions
 
 - no transition should silently widen scope
-- `blocked` should report concrete readiness issues
+- non-ready outcomes should report concrete readiness reason codes and messages
+- `needs_clarification` should keep the workflow in `planning`
 - only explicit validation should move work beyond execution
 - future nodes should preserve the copied SOP boundary between plan, spec, implementation, and write-back

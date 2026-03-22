@@ -25,7 +25,7 @@ The copied SOP remains the development operating model. The runtime consumes the
   Markdown artifact contracts, discovery rules, and parsing helpers
 
 - `state`
-  Workflow states, readiness issues, and transition decisions
+  Workflow states, readiness results, and transition decisions
 
 - `nodes`
   Narrow executable workflow steps such as `plan-to-spec`
@@ -39,15 +39,16 @@ The copied SOP remains the development operating model. The runtime consumes the
 - `cli`
   Human-facing command entrypoints
 
-## First slice boundary
+## Current slice boundary
 
-The first slice implements only enough runtime to compile a durable plan into a draft task spec:
+The current implemented slice provides only enough runtime to check plan readiness and compile a durable plan into a draft task spec:
 
 - plan and artifact discovery
 - Markdown contract parsing
-- workflow-state transition from `planning` to `spec-ready`
+- plan readiness classification for `ready`, `needs_clarification`, and `blocked`
+- workflow-state transitions from `planning` to `planning`, `spec-ready`, or `blocked`
 - draft spec rendering
 - JSON run logging
-- CLI invocation through `ae-runtime plan-to-spec`
+- CLI invocation through `ae-runtime plan-readiness-check` and `ae-runtime plan-to-spec`
 
-Future slices may add readiness checks, executor dispatch, validation ingestion, and write-back suggestions, but they are intentionally not part of this landing.
+Future slices may add executor dispatch, validation ingestion, and write-back suggestions, but they are intentionally not part of this landing.

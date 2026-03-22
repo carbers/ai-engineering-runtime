@@ -91,6 +91,50 @@ def _write_repo_file(root: Path, relative_path: str, content: str) -> None:
 
 
 class CliTests(unittest.TestCase):
+    def test_plan_readiness_check_reports_ready(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            _write_repo_file(root, "docs/runtime/roadmap.md", VALID_ROADMAP)
+
+            stdout = io.StringIO()
+            stderr = io.StringIO()
+            with redirect_stdout(stdout), redirect_stderr(stderr):
+                exit_code = main(
+                    ["plan-readiness-check", "--plan", "docs/runtime/roadmap.md"],
+                    repo_root=root,
+                    today=date(2026, 3, 22),
+                )
+
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(stderr.getvalue(), "")
+            self.assertIn("plan-readiness-check completed", stdout.getvalue())
+            self.assertIn("Readiness: ready", stdout.getvalue())
+            self.assertIn("State: spec-ready", stdout.getvalue())
+
+    def test_plan_readiness_check_reports_needs_clarification(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            clarification_roadmap = VALID_ROADMAP.replace(
+                "### Done When\nThe CLI turns this roadmap into a draft spec.\n\n",
+                "### Done When\nTBD after the acceptance criteria are clarified.\n\n",
+            )
+            _write_repo_file(root, "docs/runtime/roadmap.md", clarification_roadmap)
+
+            stdout = io.StringIO()
+            stderr = io.StringIO()
+            with redirect_stdout(stdout), redirect_stderr(stderr):
+                exit_code = main(
+                    ["plan-readiness-check", "--plan", "docs/runtime/roadmap.md"],
+                    repo_root=root,
+                    today=date(2026, 3, 22),
+                )
+
+            self.assertEqual(exit_code, 1)
+            self.assertEqual(stdout.getvalue(), "")
+            self.assertIn("plan-readiness-check failed", stderr.getvalue())
+            self.assertIn("Readiness: needs_clarification", stderr.getvalue())
+            self.assertIn("placeholder-first-slice-field", stderr.getvalue())
+
     def test_main_reports_success_and_writes_spec(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
@@ -108,6 +152,7 @@ class CliTests(unittest.TestCase):
             self.assertEqual(exit_code, 0)
             self.assertEqual(stderr.getvalue(), "")
             self.assertIn("plan-to-spec completed", stdout.getvalue())
+            self.assertIn("Readiness: ready", stdout.getvalue())
             self.assertIn("State: spec-ready", stdout.getvalue())
             self.assertIn(
                 "Spec: docs/specs/20260322-001-runtime-plan-to-spec-foundation.md",
@@ -153,6 +198,7 @@ class CliTests(unittest.TestCase):
             self.assertEqual(exit_code, 1)
             self.assertEqual(stdout.getvalue(), "")
             self.assertIn("plan-to-spec failed", stderr.getvalue())
+            self.assertIn("Readiness: blocked", stderr.getvalue())
             self.assertIn("Missing required First Slice field: Done When", stderr.getvalue())
 
 

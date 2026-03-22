@@ -16,7 +16,7 @@ if str(SRC) not in sys.path:
 from ai_engineering_runtime.adapters import FileSystemAdapter  # noqa: E402
 from ai_engineering_runtime.engine import RuntimeEngine  # noqa: E402
 from ai_engineering_runtime.nodes.plan_to_spec import PlanToSpecNode, PlanToSpecRequest  # noqa: E402
-from ai_engineering_runtime.state import WorkflowState  # noqa: E402
+from ai_engineering_runtime.state import ReadinessStatus, WorkflowState  # noqa: E402
 
 
 VALID_ROADMAP = """
@@ -118,6 +118,8 @@ class PlanToSpecNodeTests(unittest.TestCase):
 
             self.assertTrue(result.success)
             self.assertEqual(result.to_state, WorkflowState.SPEC_READY)
+            self.assertIsNotNone(result.readiness)
+            self.assertEqual(result.readiness.status, ReadinessStatus.READY)
             self.assertIsNotNone(result.output_path)
             self.assertTrue(result.output_path.exists())
             self.assertIsNotNone(result.log_path)
@@ -128,6 +130,7 @@ class PlanToSpecNodeTests(unittest.TestCase):
             self.assertTrue(payload["success"])
             self.assertEqual(payload["to_state"], "spec-ready")
             self.assertEqual(payload["log_path"], ".runtime/runs/" + result.log_path.name)
+            self.assertEqual(payload["readiness"]["status"], "ready")
 
     def test_dry_run_emits_spec_without_writing_output(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -147,6 +150,8 @@ class PlanToSpecNodeTests(unittest.TestCase):
             )
 
             self.assertTrue(result.success)
+            self.assertIsNotNone(result.readiness)
+            self.assertEqual(result.readiness.status, ReadinessStatus.READY)
             self.assertIsNotNone(result.output_path)
             self.assertFalse(result.output_path.exists())
             self.assertIsNotNone(result.rendered_output)
@@ -169,6 +174,8 @@ class PlanToSpecNodeTests(unittest.TestCase):
 
             self.assertFalse(result.success)
             self.assertEqual(result.to_state, WorkflowState.BLOCKED)
+            self.assertIsNotNone(result.readiness)
+            self.assertEqual(result.readiness.status, ReadinessStatus.BLOCKED)
             self.assertFalse((root / "docs" / "specs").exists())
             self.assertTrue(any("Done When" in issue.message for issue in result.issues))
             self.assertTrue(result.log_path.exists())
@@ -192,6 +199,8 @@ class PlanToSpecNodeTests(unittest.TestCase):
 
             self.assertFalse(result.success)
             self.assertEqual(result.to_state, WorkflowState.BLOCKED)
+            self.assertIsNotNone(result.readiness)
+            self.assertEqual(result.readiness.status, ReadinessStatus.BLOCKED)
             self.assertTrue(any("Markdown list items" in issue.message for issue in result.issues))
 
 

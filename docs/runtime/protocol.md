@@ -66,8 +66,19 @@ Inside `## First Slice`, the runtime expects `###` subheadings for the fields it
 - the plan `Goal` becomes the generated task spec `Goal`
 - the runtime preserves the copied SOP task-spec structure when rendering output
 
+## Readiness rules
+
+- `ready`
+  the plan satisfies the required section and `First Slice` contract checks and does not contain placeholder content in required fields
+
+- `needs_clarification`
+  the plan satisfies the required structure, but one or more required sections or fields still contain placeholder text such as `TBD`, `TODO`, `to be decided`, or `to be determined`
+
+- `blocked`
+  the plan is missing required sections or fields, or violates required field-format rules such as list syntax or `Yes` / `No` choice fields
+
 ## Support level in this pass
 
 - fully supported: discovery and parsing for the canonical roadmap plan, task specs, facts, and skills
-- executable support: `plan` -> `task-spec`
+- executable support: `plan-readiness-check` and `plan` -> `task-spec`
 - documented only for now: executor dispatch, validation result ingestion, write-back suggestions, and follow-up suggestions

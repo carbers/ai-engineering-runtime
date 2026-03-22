@@ -15,7 +15,7 @@ This repository establishes a practical runtime layer that can:
 5. collect validation results
 6. suggest write-back and follow-up work
 
-The current implementation is intentionally smaller than that full direction: one stdlib-only Python CLI, one real node, and one documented contract for compiling a plan into a narrow draft task spec.
+The current implementation is intentionally smaller than that full direction: one stdlib-only Python CLI, two real nodes, and one documented contract for checking plan readiness and compiling a plan into a narrow draft task spec.
 
 ## What stays the same
 
@@ -53,22 +53,26 @@ See `AGENTS.md` for the full repository rules.
 - `tests/*`
   `unittest` coverage for the implemented runtime slice.
 
-## First implemented command
+## Implemented commands
 
-The first executable slice is:
+The current executable slice is:
 
 ```text
+ae-runtime plan-readiness-check --plan docs/runtime/roadmap.md
 ae-runtime plan-to-spec --plan docs/runtime/roadmap.md
 ```
 
-Use `--dry-run` to preview the generated spec and readiness outcome without writing a spec file.
+Use `plan-readiness-check` to inspect a plan artifact and return a structured readiness outcome with stable reason codes.
+
+Use `plan-to-spec --dry-run` to preview the generated spec and readiness outcome without writing a spec file.
 Omit `--dry-run` to write the next dated spec under `docs/specs/`.
 
-This command currently:
+These commands currently:
 
 - parse a roadmap or plan artifact from Markdown
-- validate the required plan and `First Slice` contract sections
-- render a narrow draft task spec
+- classify plan readiness as `ready`, `needs_clarification`, or `blocked`
+- return stable reason codes and messages for non-ready outcomes
+- render a narrow draft task spec only when readiness is `ready`
 - write a JSON run log under `.runtime/runs/`
 
 ## What this repository is not
@@ -85,5 +89,5 @@ This repository is not:
 1. read `AGENTS.md`
 2. read `docs/runtime/architecture.md`
 3. read `docs/runtime/roadmap.md`
-4. read `docs/specs/20260322-001-runtime-plan-to-spec-foundation.md`
-5. run `ae-runtime plan-to-spec --plan docs/runtime/roadmap.md` once Python 3.11+ is available locally
+4. read `docs/specs/20260322-002-runtime-plan-readiness-check.md`
+5. run `ae-runtime plan-readiness-check --plan docs/runtime/roadmap.md` once Python 3.11+ is available locally
