@@ -1,0 +1,22 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+
+# Python
+__pycache__/
+
+# Node
+node_modules/
+
+# Archives
+*.zip
+
+# Local tooling
+.tools/
+
+# Runtime logs
+.runtime/
