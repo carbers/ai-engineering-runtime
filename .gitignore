@@ -8,6 +8,7 @@ Thumbs.db
 
 # Python
 __pycache__/
+*.egg-info/
 
 # Node
 node_modules/
@@ -17,6 +18,7 @@ node_modules/
 
 # Local tooling
 .tools/
+.tmp/
 
 # Runtime logs
 .runtime/

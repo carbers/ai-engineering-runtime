@@ -74,6 +74,14 @@ ae-runtime writeback-package --latest
 ae-runtime followup-package --latest
 ```
 
+The `ae-runtime` command path assumes the project has been installed into the current Python environment.
+Before installation, use the module form from the repository root:
+
+```powershell
+$env:PYTHONPATH = "src"
+python -m ai_engineering_runtime plan-readiness-check --plan docs/runtime/roadmap.md
+```
+
 Use `plan-readiness-check` to inspect a plan artifact and return a structured readiness outcome with stable reason codes.
 
 Use `plan-to-spec --dry-run` to preview the generated spec and readiness outcome without writing a spec file.
@@ -99,6 +107,26 @@ These commands currently:
 - write a JSON run log under `.runtime/runs/`
 - write a JSON run summary under `.runtime/summaries/`
 
+The runtime creates the `.runtime/` directory tree on demand when one of those artifacts is first materialized.
+
+## Local validation
+
+Use one narrow local validation path for closeout work:
+
+```powershell
+python -m unittest discover -s tests -v
+
+$env:PYTHONPATH = "src"
+python -m ai_engineering_runtime plan-readiness-check --plan docs/runtime/roadmap.md
+```
+
+If you also want to validate the installed console script path in the same environment:
+
+```powershell
+python -m pip install -e .
+ae-runtime plan-readiness-check --plan docs/runtime/roadmap.md
+```
+
 ## What this repository is not
 
 This repository is not:
@@ -114,4 +142,4 @@ This repository is not:
 2. read `docs/runtime/architecture.md`
 3. read `docs/runtime/roadmap.md`
 4. read `docs/specs/20260322-002-runtime-plan-readiness-check.md`
-5. run `ae-runtime plan-readiness-check --plan docs/runtime/roadmap.md` once Python 3.11+ is available locally
+5. run `$env:PYTHONPATH='src'; python -m ai_engineering_runtime plan-readiness-check --plan docs/runtime/roadmap.md`

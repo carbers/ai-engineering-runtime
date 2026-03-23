@@ -8,10 +8,15 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "src"
+TESTS = ROOT / "tests"
 FIXTURES = ROOT / "tests" / "fixtures" / "run_logs"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
+if str(TESTS) not in sys.path:
+    sys.path.insert(0, str(TESTS))
+from support import activate_repo_tempdir  # noqa: E402
 
+activate_repo_tempdir(tempfile)
 from ai_engineering_runtime.adapters import FileSystemAdapter  # noqa: E402
 from ai_engineering_runtime.engine import RuntimeEngine  # noqa: E402
 from ai_engineering_runtime.history_selection import (  # noqa: E402
@@ -101,3 +106,5 @@ class HistorySelectionTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+

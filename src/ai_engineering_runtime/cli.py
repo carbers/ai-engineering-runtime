@@ -387,199 +387,167 @@ def main(
 
     adapter = FileSystemAdapter(repo_root or Path.cwd())
     engine = RuntimeEngine(adapter)
-
-    if args.command == "plan-readiness-check":
-        result = engine.run(
-            PlanReadinessCheckNode(
-                PlanReadinessCheckRequest(
-                    plan_path=Path(args.plan),
+    dry_run = False
+    try:
+        if args.command == "plan-readiness-check":
+            result = engine.run(
+                PlanReadinessCheckNode(
+                    PlanReadinessCheckRequest(
+                        plan_path=Path(args.plan),
+                    )
                 )
             )
-        )
-        _emit_result(result, adapter, dry_run=False)
-        return 0 if result.success else 1
-
-    if args.command == "task-spec-readiness-check":
-        result = engine.run(
-            TaskSpecReadinessCheckNode(
-                TaskSpecReadinessCheckRequest(
-                    spec_path=Path(args.spec),
+        elif args.command == "task-spec-readiness-check":
+            result = engine.run(
+                TaskSpecReadinessCheckNode(
+                    TaskSpecReadinessCheckRequest(
+                        spec_path=Path(args.spec),
+                    )
                 )
             )
-        )
-        _emit_result(result, adapter, dry_run=False)
-        return 0 if result.success else 1
-
-    if args.command == "validation-collect":
-        result = engine.run(
-            ValidationCollectNode(
-                ValidationCollectRequest(
-                    spec_path=Path(args.spec) if args.spec else None,
-                    command_status=_parse_validation_status(args.command_status),
-                    command_summary=args.command_summary,
-                    black_box_status=_parse_validation_status(args.black_box_status),
-                    black_box_summary=args.black_box_summary,
-                    white_box_status=_parse_validation_status(args.white_box_status),
-                    white_box_summary=args.white_box_summary,
-                    notes=tuple(args.note),
+        elif args.command == "validation-collect":
+            result = engine.run(
+                ValidationCollectNode(
+                    ValidationCollectRequest(
+                        spec_path=Path(args.spec) if args.spec else None,
+                        command_status=_parse_validation_status(args.command_status),
+                        command_summary=args.command_summary,
+                        black_box_status=_parse_validation_status(args.black_box_status),
+                        black_box_summary=args.black_box_summary,
+                        white_box_status=_parse_validation_status(args.white_box_status),
+                        white_box_summary=args.white_box_summary,
+                        notes=tuple(args.note),
+                    )
                 )
             )
-        )
-        _emit_result(result, adapter, dry_run=False)
-        return 0 if result.success else 1
-
-    if args.command == "followup-suggester":
-        result = engine.run(
-            FollowupSuggesterNode(
-                FollowupSuggesterRequest(
-                    readiness_status=_parse_readiness_status(args.readiness_status),
-                    validation_status=_parse_aggregate_validation_status(args.validation_status),
-                    writeback_destination=_parse_writeback_destination(args.writeback_destination),
-                    closeout_hint=_parse_closeout_hint(args.closeout_hint),
+        elif args.command == "followup-suggester":
+            result = engine.run(
+                FollowupSuggesterNode(
+                    FollowupSuggesterRequest(
+                        readiness_status=_parse_readiness_status(args.readiness_status),
+                        validation_status=_parse_aggregate_validation_status(args.validation_status),
+                        writeback_destination=_parse_writeback_destination(args.writeback_destination),
+                        closeout_hint=_parse_closeout_hint(args.closeout_hint),
+                    )
                 )
             )
-        )
-        _emit_result(result, adapter, dry_run=False)
-        return 0 if result.success else 1
-
-    if args.command == "executor-dispatch":
-        result = engine.run(
-            ExecutorDispatchNode(
-                ExecutorDispatchRequest(
-                    spec_path=Path(args.spec),
-                    target=_parse_executor_target(args.executor),
-                    mode=_parse_dispatch_mode(args.mode),
+        elif args.command == "executor-dispatch":
+            result = engine.run(
+                ExecutorDispatchNode(
+                    ExecutorDispatchRequest(
+                        spec_path=Path(args.spec),
+                        target=_parse_executor_target(args.executor),
+                        mode=_parse_dispatch_mode(args.mode),
+                    )
                 )
             )
-        )
-        _emit_result(result, adapter, dry_run=False)
-        return 0 if result.success else 1
-
-    if args.command == "writeback-classifier":
-        result = engine.run(
-            WritebackClassifierNode(
-                WritebackClassifierRequest(
-                    text=args.text,
-                    candidate_kind=_parse_writeback_kind(args.kind),
+        elif args.command == "writeback-classifier":
+            result = engine.run(
+                WritebackClassifierNode(
+                    WritebackClassifierRequest(
+                        text=args.text,
+                        candidate_kind=_parse_writeback_kind(args.kind),
+                    )
                 )
             )
-        )
-        _emit_result(result, adapter, dry_run=False)
-        return 0 if result.success else 1
-
-    if args.command == "result-log-replay":
-        result = engine.run(
-            ResultLogReplayNode(
-                ResultLogReplayRequest(
-                    log_path=Path(args.log) if args.log else None,
-                    latest=bool(args.latest),
-                    node_name=args.node,
+        elif args.command == "result-log-replay":
+            result = engine.run(
+                ResultLogReplayNode(
+                    ResultLogReplayRequest(
+                        log_path=Path(args.log) if args.log else None,
+                        latest=bool(args.latest),
+                        node_name=args.node,
+                    )
                 )
             )
-        )
-        _emit_result(result, adapter, dry_run=False)
-        return 0 if result.success else 1
-
-    if args.command == "run-history-select":
-        artifact_kind, artifact_path = _parse_history_target(args)
-        result = engine.run(
-            RunHistorySelectNode(
-                RunHistorySelectRequest(
-                    artifact_kind=artifact_kind,
-                    artifact_path=artifact_path,
-                    node_name=args.node,
-                    signal_kind=_parse_replay_signal_kind(args.signal_kind),
-                    limit=args.limit,
+        elif args.command == "run-history-select":
+            artifact_kind, artifact_path = _parse_history_target(args)
+            result = engine.run(
+                RunHistorySelectNode(
+                    RunHistorySelectRequest(
+                        artifact_kind=artifact_kind,
+                        artifact_path=artifact_path,
+                        node_name=args.node,
+                        signal_kind=_parse_replay_signal_kind(args.signal_kind),
+                        limit=args.limit,
+                    )
                 )
             )
-        )
-        _emit_result(result, adapter, dry_run=False)
-        return 0 if result.success else 1
-
-    if args.command == "run-summary":
-        result = engine.run(
-            RunSummaryNode(
-                RunSummaryRequest(
-                    log_path=Path(args.log) if args.log else None,
-                    run_id=args.run_id,
-                    latest=bool(args.latest),
-                    node_name=args.node,
-                    json_output=bool(args.json),
+        elif args.command == "run-summary":
+            result = engine.run(
+                RunSummaryNode(
+                    RunSummaryRequest(
+                        log_path=Path(args.log) if args.log else None,
+                        run_id=args.run_id,
+                        latest=bool(args.latest),
+                        node_name=args.node,
+                        json_output=bool(args.json),
+                    )
                 )
             )
-        )
-        _emit_result(result, adapter, dry_run=False)
-        return 0 if result.success else 1
-
-    if args.command == "node-gate":
-        result = engine.run(
-            NodeGateNode(
-                NodeGateRequest(
-                    node_name=args.node,
-                    log_path=Path(args.log) if args.log else None,
-                    run_id=args.run_id,
-                    latest=bool(args.latest),
-                    summary_node_name=args.summary_node,
-                    json_output=bool(args.json),
+        elif args.command == "node-gate":
+            result = engine.run(
+                NodeGateNode(
+                    NodeGateRequest(
+                        node_name=args.node,
+                        log_path=Path(args.log) if args.log else None,
+                        run_id=args.run_id,
+                        latest=bool(args.latest),
+                        summary_node_name=args.summary_node,
+                        json_output=bool(args.json),
+                    )
                 )
             )
-        )
-        _emit_result(result, adapter, dry_run=False)
-        return 0 if result.success else 1
-
-    if args.command == "validation-rollup":
-        result = engine.run(
-            ValidationRollupNode(
-                ValidationRollupRequest(
-                    log_path=Path(args.log) if args.log else None,
-                    run_id=args.run_id,
-                    latest=bool(args.latest),
-                    node_name=args.node,
-                    json_output=bool(args.json),
+        elif args.command == "validation-rollup":
+            result = engine.run(
+                ValidationRollupNode(
+                    ValidationRollupRequest(
+                        log_path=Path(args.log) if args.log else None,
+                        run_id=args.run_id,
+                        latest=bool(args.latest),
+                        node_name=args.node,
+                        json_output=bool(args.json),
+                    )
                 )
             )
-        )
-        _emit_result(result, adapter, dry_run=False)
-        return 0 if result.success else 1
-
-    if args.command == "writeback-package":
-        result = engine.run(
-            WritebackPackageNode(
-                WritebackPackageRequest(
-                    log_path=Path(args.log) if args.log else None,
-                    run_id=args.run_id,
-                    latest=bool(args.latest),
-                    node_name=args.node,
-                    json_output=bool(args.json),
+        elif args.command == "writeback-package":
+            result = engine.run(
+                WritebackPackageNode(
+                    WritebackPackageRequest(
+                        log_path=Path(args.log) if args.log else None,
+                        run_id=args.run_id,
+                        latest=bool(args.latest),
+                        node_name=args.node,
+                        json_output=bool(args.json),
+                    )
                 )
             )
-        )
-        _emit_result(result, adapter, dry_run=False)
-        return 0 if result.success else 1
-
-    if args.command == "followup-package":
-        result = engine.run(
-            FollowupPackageNode(
-                FollowupPackageRequest(
-                    log_path=Path(args.log) if args.log else None,
-                    run_id=args.run_id,
-                    latest=bool(args.latest),
-                    node_name=args.node,
-                    json_output=bool(args.json),
+        elif args.command == "followup-package":
+            result = engine.run(
+                FollowupPackageNode(
+                    FollowupPackageRequest(
+                        log_path=Path(args.log) if args.log else None,
+                        run_id=args.run_id,
+                        latest=bool(args.latest),
+                        node_name=args.node,
+                        json_output=bool(args.json),
+                    )
                 )
             )
-        )
-        _emit_result(result, adapter, dry_run=False)
-        return 0 if result.success else 1
+        else:
+            dry_run = bool(args.dry_run)
+            request = PlanToSpecRequest(
+                plan_path=Path(args.plan),
+                dry_run=dry_run,
+                output_path=Path(args.output) if args.output else None,
+                created_on=today or date.today(),
+            )
+            result = engine.run(PlanToSpecNode(request))
+    except OSError as error:
+        _emit_runtime_error(args.command or "ae-runtime", error)
+        return 1
 
-    request = PlanToSpecRequest(
-        plan_path=Path(args.plan),
-        dry_run=args.dry_run,
-        output_path=Path(args.output) if args.output else None,
-        created_on=today or date.today(),
-    )
-    result = engine.run(PlanToSpecNode(request))
-    _emit_result(result, adapter, dry_run=args.dry_run)
+    _emit_result(result, adapter, dry_run=dry_run)
     return 0 if result.success else 1
 
 
@@ -749,6 +717,19 @@ def _emit_result(result: RunResult, adapter: FileSystemAdapter, *, dry_run: bool
     if result.success and result.rendered_output is not None and (dry_run or render_always):
         print("", file=stream)
         print(result.rendered_output.rstrip(), file=stream)
+
+
+def _emit_runtime_error(command_name: str, error: OSError) -> None:
+    print(f"{command_name} failed", file=sys.stderr)
+    print(f"- runtime-io-error: {_format_os_error(error)}", file=sys.stderr)
+
+
+def _format_os_error(error: OSError) -> str:
+    details = str(error).strip() or error.__class__.__name__
+    filename = getattr(error, "filename", None)
+    if filename is not None and str(filename) not in details:
+        return f"{details}: {filename}"
+    return details
 
 
 def _parse_writeback_kind(value: str | None) -> WritebackCandidateKind | None:

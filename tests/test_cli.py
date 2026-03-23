@@ -9,13 +9,19 @@ import sys
 import tempfile
 import textwrap
 import unittest
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "src"
+TESTS = ROOT / "tests"
 RUN_LOG_FIXTURES = ROOT / "tests" / "fixtures" / "run_logs"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
+if str(TESTS) not in sys.path:
+    sys.path.insert(0, str(TESTS))
+from support import activate_repo_tempdir  # noqa: E402
 
+activate_repo_tempdir(tempfile)
 from ai_engineering_runtime.adapters import FileSystemAdapter  # noqa: E402
 from ai_engineering_runtime.cli import main  # noqa: E402
 from ai_engineering_runtime.engine import RuntimeEngine  # noqa: E402
@@ -483,6 +489,29 @@ class CliTests(unittest.TestCase):
             self.assertIn("Readiness: blocked", stderr.getvalue())
             self.assertIn("Missing required First Slice field: Done When", stderr.getvalue())
 
+    def test_main_reports_runtime_io_errors_to_stderr(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            _write_repo_file(root, "docs/runtime/roadmap.md", VALID_ROADMAP)
+
+            stdout = io.StringIO()
+            stderr = io.StringIO()
+            with (
+                patch("ai_engineering_runtime.cli.RuntimeEngine.run", side_effect=PermissionError("Access denied")),
+                redirect_stdout(stdout),
+                redirect_stderr(stderr),
+            ):
+                exit_code = main(
+                    ["plan-readiness-check", "--plan", "docs/runtime/roadmap.md"],
+                    repo_root=root,
+                    today=date(2026, 3, 22),
+                )
+
+            self.assertEqual(exit_code, 1)
+            self.assertEqual(stdout.getvalue(), "")
+            self.assertIn("plan-readiness-check failed", stderr.getvalue())
+            self.assertIn("runtime-io-error", stderr.getvalue())
+
     def test_writeback_classifier_reports_destination_and_reason(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
@@ -773,3 +802,5 @@ class CliTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
