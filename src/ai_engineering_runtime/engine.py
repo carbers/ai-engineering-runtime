@@ -11,6 +11,7 @@ from ai_engineering_runtime.gate_evaluator import NodeGateResult
 from ai_engineering_runtime.run_summary import RunSummary
 from ai_engineering_runtime.state import (
     DispatchResult,
+    ExecutionResult,
     FollowupResult,
     ReadinessResult,
     RuntimeReason,
@@ -44,6 +45,7 @@ class RunResult:
     writeback: WritebackResult | None = None
     followup: FollowupResult | None = None
     dispatch: DispatchResult | None = None
+    execution: ExecutionResult | None = None
     replay: ReplayResult | None = None
     history_selection: HistorySelectionResult | None = None
     summary: RunSummary | None = None
@@ -77,6 +79,7 @@ class RunResult:
             "writeback": self.writeback.to_record() if self.writeback is not None else None,
             "followup": self.followup.to_record() if self.followup is not None else None,
             "dispatch": self.dispatch.to_record() if self.dispatch is not None else None,
+            "execution": self.execution.to_record() if self.execution is not None else None,
             "replay": self.replay.to_record(adapter.display_path) if self.replay is not None else None,
             "history_selection": (
                 self.history_selection.to_record(adapter.display_path)

@@ -10,8 +10,22 @@ from typing import Any, Callable
 
 from ai_engineering_runtime.state import RuntimeReason
 from ai_engineering_runtime.state import (
+    DispatchMode,
+    DispatchPayload,
+    DispatchResult,
+    DispatchStatus,
+    ExecutionArtifactRef,
+    ExecutionResult,
+    ExecutionStatus,
     FollowupAction,
     FollowupResult,
+    ExecutorCapabilityProfile,
+    ExecutorDescriptor,
+    ExecutorRequirements,
+    ExecutorTarget,
+    RepairSpecCandidate,
+    ReviewFinding,
+    ReviewFindingSeverity,
     ValidationEvidence,
     ValidationEvidenceKind,
     ValidationEvidenceStatus,
@@ -121,6 +135,8 @@ class RunRecord:
     validation: ValidationResult | None = None
     writeback: WritebackResult | None = None
     followup: FollowupResult | None = None
+    dispatch: DispatchResult | None = None
+    execution: ExecutionResult | None = None
     issues: tuple[RuntimeReason, ...] = ()
     reasons: tuple[RuntimeReason, ...] = ()
 
@@ -261,6 +277,44 @@ def load_replay_result(log_path: Path) -> ReplayResult:
             ordered_at=ordered_at,
             node_name=_coerce_str(payload.get("node")) or fallback_node,
             reasons=_dedupe_reasons((*envelope_errors, *issues)),
+        )
+
+    typed_dispatch = _parse_dispatch_result(payload.get("dispatch"))
+    if typed_dispatch is _INVALID:
+        return ReplayResult(
+            status=ReplayStatus.REJECTED,
+            source_log_path=resolved_log_path,
+            ordered_at=ordered_at,
+            node_name=_coerce_str(payload.get("node")) or fallback_node,
+            reasons=_dedupe_reasons(
+                (
+                    RuntimeReason(
+                        code="invalid-run-log-envelope",
+                        message="Run log dispatch payload must use the current structured schema.",
+                        field="dispatch",
+                    ),
+                    *issues,
+                )
+            ),
+        )
+
+    typed_execution = _parse_execution_result(payload.get("execution"))
+    if typed_execution is _INVALID:
+        return ReplayResult(
+            status=ReplayStatus.REJECTED,
+            source_log_path=resolved_log_path,
+            ordered_at=ordered_at,
+            node_name=_coerce_str(payload.get("node")) or fallback_node,
+            reasons=_dedupe_reasons(
+                (
+                    RuntimeReason(
+                        code="invalid-run-log-envelope",
+                        message="Run log execution payload must use the current structured schema.",
+                        field="execution",
+                    ),
+                    *issues,
+                )
+            ),
         )
 
     node_name = str(payload["node"])
@@ -591,6 +645,46 @@ def load_run_record(log_path: Path) -> RunRecord:
             ),
         )
 
+    typed_dispatch = _parse_dispatch_result(payload.get("dispatch"))
+    if typed_dispatch is _INVALID:
+        return RunRecord(
+            status=RunRecordStatus.REJECTED,
+            source_log_path=resolved_log_path,
+            ordered_at=ordered_at,
+            node_name=_coerce_str(payload.get("node")) or fallback_node,
+            issues=issues,
+            reasons=_dedupe_reasons(
+                (
+                    RuntimeReason(
+                        code="invalid-run-log-envelope",
+                        message="Run log dispatch payload must use the current structured schema.",
+                        field="dispatch",
+                    ),
+                    *issues,
+                )
+            ),
+        )
+
+    typed_execution = _parse_execution_result(payload.get("execution"))
+    if typed_execution is _INVALID:
+        return RunRecord(
+            status=RunRecordStatus.REJECTED,
+            source_log_path=resolved_log_path,
+            ordered_at=ordered_at,
+            node_name=_coerce_str(payload.get("node")) or fallback_node,
+            issues=issues,
+            reasons=_dedupe_reasons(
+                (
+                    RuntimeReason(
+                        code="invalid-run-log-envelope",
+                        message="Run log execution payload must use the current structured schema.",
+                        field="execution",
+                    ),
+                    *issues,
+                )
+            ),
+        )
+
     node_name = str(payload["node"])
     signal_kind, signal_value, signal_reasons = _extract_record_signal(node_name, payload)
     return RunRecord(
@@ -608,6 +702,8 @@ def load_run_record(log_path: Path) -> RunRecord:
         validation=typed_validation,
         writeback=typed_writeback,
         followup=typed_followup,
+        dispatch=typed_dispatch,
+        execution=typed_execution,
         issues=issues,
     )
 
@@ -811,6 +907,247 @@ def _parse_followup_result(value: object) -> FollowupResult | None | object:
     )
 
 
+def _parse_dispatch_result(value: object) -> DispatchResult | None | object:
+    if value is None:
+        return None
+    if not isinstance(value, dict):
+        return _INVALID
+
+    target = _parse_enum(value.get("target"), ExecutorTarget)
+    status = _parse_enum(value.get("status"), DispatchStatus)
+    mode = _parse_enum(value.get("mode"), DispatchMode)
+    payload = _parse_dispatch_payload(value.get("payload"))
+    reasons = _parse_reason_list(value.get("reasons", []), field="dispatch.reasons")
+    executor = _parse_executor_descriptor(value.get("executor")) if value.get("executor") is not None else None
+    requirements = (
+        _parse_executor_requirements(value.get("requirements"))
+        if value.get("requirements") is not None
+        else None
+    )
+    execution_metadata = value.get("execution_metadata", {})
+    if target is None or status is None or mode is None or payload is _INVALID or reasons is None:
+        return _INVALID
+    if requirements is _INVALID:
+        return _INVALID
+    if not isinstance(execution_metadata, dict):
+        return _INVALID
+
+    return DispatchResult(
+        target=target,
+        status=status,
+        mode=mode,
+        payload=payload,
+        reasons=reasons,
+        executor=executor,
+        requirements=requirements,
+        execution_metadata=execution_metadata,
+    )
+
+
+def _parse_dispatch_payload(value: object) -> DispatchPayload | None | object:
+    if value is None:
+        return None
+    if not isinstance(value, dict):
+        return _INVALID
+    title = _coerce_str(value.get("title"))
+    goal = _coerce_str(value.get("goal"))
+    in_scope = value.get("in_scope", [])
+    done_when = _coerce_str(value.get("done_when"))
+    if title is None or goal is None or done_when is None or not _is_list_of_strings(in_scope):
+        return _INVALID
+    return DispatchPayload(
+        title=title,
+        goal=goal,
+        in_scope=tuple(in_scope),
+        done_when=done_when,
+    )
+
+
+def _parse_execution_result(value: object) -> ExecutionResult | None | object:
+    if value is None:
+        return None
+    if not isinstance(value, dict):
+        return _INVALID
+
+    executor = _parse_executor_descriptor(value.get("executor"))
+    final_status = _parse_enum(value.get("final_status"), ExecutionStatus)
+    spec_identity = value.get("spec_identity")
+    dispatch_summary = value.get("dispatch_summary")
+    summary = _coerce_str(value.get("summary"))
+    changed_files = value.get("changed_files", [])
+    validations_claimed = value.get("validations_claimed", [])
+    uncovered_items = value.get("uncovered_items", [])
+    suggested_followups = value.get("suggested_followups", [])
+    raw_artifact_refs = value.get("raw_artifact_refs", [])
+    findings = value.get("findings", [])
+    repair_spec_candidate = value.get("repair_spec_candidate")
+    if executor is None or final_status is None or summary is None or not isinstance(dispatch_summary, dict):
+        return _INVALID
+    if spec_identity is not None and not isinstance(spec_identity, str):
+        return _INVALID
+    if not _is_list_of_strings(changed_files):
+        return _INVALID
+    if not _is_list_of_strings(validations_claimed):
+        return _INVALID
+    if not _is_list_of_strings(uncovered_items):
+        return _INVALID
+    if not _is_list_of_strings(suggested_followups):
+        return _INVALID
+
+    parsed_refs: list[ExecutionArtifactRef] = []
+    for item in raw_artifact_refs:
+        parsed = _parse_execution_artifact_ref(item)
+        if parsed is _INVALID:
+            return _INVALID
+        parsed_refs.append(parsed)
+
+    parsed_findings: list[ReviewFinding] = []
+    for item in findings:
+        parsed = _parse_review_finding(item)
+        if parsed is _INVALID:
+            return _INVALID
+        parsed_findings.append(parsed)
+
+    parsed_candidate = _parse_repair_spec_candidate(repair_spec_candidate)
+    if parsed_candidate is _INVALID:
+        return _INVALID
+
+    stdout_summary = value.get("stdout_summary")
+    stderr_summary = value.get("stderr_summary")
+    log_summary = value.get("log_summary")
+    patch_ref = value.get("patch_ref")
+    branch_ref = value.get("branch_ref")
+    commit_ref = value.get("commit_ref")
+    for item in (stdout_summary, stderr_summary, log_summary, patch_ref, branch_ref, commit_ref):
+        if item is not None and not isinstance(item, str):
+            return _INVALID
+
+    return ExecutionResult(
+        executor=executor,
+        spec_identity=spec_identity,
+        dispatch_summary=dispatch_summary,
+        final_status=final_status,
+        summary=summary,
+        changed_files=tuple(changed_files),
+        patch_ref=patch_ref,
+        branch_ref=branch_ref,
+        commit_ref=commit_ref,
+        stdout_summary=stdout_summary,
+        stderr_summary=stderr_summary,
+        log_summary=log_summary,
+        validations_claimed=tuple(validations_claimed),
+        uncovered_items=tuple(uncovered_items),
+        suggested_followups=tuple(suggested_followups),
+        raw_artifact_refs=tuple(parsed_refs),
+        findings=tuple(parsed_findings),
+        repair_spec_candidate=parsed_candidate,
+    )
+
+
+def _parse_executor_descriptor(value: object) -> ExecutorDescriptor | None:
+    if not isinstance(value, dict):
+        return None
+    name = _coerce_str(value.get("name"))
+    executor_type = _coerce_str(value.get("type"))
+    version = _coerce_str(value.get("version"))
+    capabilities = value.get("capabilities")
+    if name is None or executor_type is None or version is None or not isinstance(capabilities, dict):
+        return None
+    parsed_capabilities = _parse_capability_profile(capabilities)
+    if parsed_capabilities is None:
+        return None
+    return ExecutorDescriptor(
+        name=name,
+        executor_type=executor_type,
+        version=version,
+        capabilities=parsed_capabilities,
+    )
+
+
+def _parse_executor_requirements(value: object) -> ExecutorRequirements | object:
+    if not isinstance(value, dict):
+        return _INVALID
+    parsed = _parse_capability_profile(value)
+    if parsed is None:
+        return _INVALID
+    return ExecutorRequirements(**parsed.to_record())
+
+
+def _parse_capability_profile(value: dict[str, Any]) -> ExecutorCapabilityProfile | None:
+    keys = (
+        "can_edit_files",
+        "can_run_shell",
+        "can_open_repo_context",
+        "can_return_patch",
+        "can_return_commit",
+        "can_run_tests",
+        "can_do_review_only",
+        "supports_noninteractive",
+        "supports_resume",
+    )
+    payload: dict[str, bool] = {}
+    for key in keys:
+        item = value.get(key)
+        if not isinstance(item, bool):
+            return None
+        payload[key] = item
+    return ExecutorCapabilityProfile(**payload)
+
+
+def _parse_execution_artifact_ref(value: object) -> ExecutionArtifactRef | object:
+    if not isinstance(value, dict):
+        return _INVALID
+    kind = _coerce_str(value.get("kind"))
+    raw_value = _coerce_str(value.get("value"))
+    if kind is None or raw_value is None:
+        return _INVALID
+    return ExecutionArtifactRef(kind=kind, value=raw_value)
+
+
+def _parse_review_finding(value: object) -> ReviewFinding | object:
+    if not isinstance(value, dict):
+        return _INVALID
+    code = _coerce_str(value.get("code"))
+    message = _coerce_str(value.get("message"))
+    severity = _parse_enum(value.get("severity"), ReviewFindingSeverity)
+    field_name = value.get("field")
+    source = value.get("source")
+    if code is None or message is None or severity is None:
+        return _INVALID
+    if field_name is not None and not isinstance(field_name, str):
+        return _INVALID
+    if source is not None and not isinstance(source, str):
+        return _INVALID
+    return ReviewFinding(code=code, message=message, severity=severity, field=field_name, source=source)
+
+
+def _parse_repair_spec_candidate(value: object) -> RepairSpecCandidate | None | object:
+    if value is None:
+        return None
+    if not isinstance(value, dict):
+        return _INVALID
+    title = _coerce_str(value.get("title"))
+    goal = _coerce_str(value.get("goal"))
+    in_scope = value.get("in_scope", [])
+    validation_focus = value.get("validation_focus", [])
+    triggering_findings = value.get("triggering_findings", [])
+    if title is None or goal is None or not _is_list_of_strings(in_scope) or not _is_list_of_strings(validation_focus):
+        return _INVALID
+    parsed_findings: list[ReviewFinding] = []
+    for item in triggering_findings:
+        parsed = _parse_review_finding(item)
+        if parsed is _INVALID:
+            return _INVALID
+        parsed_findings.append(parsed)
+    return RepairSpecCandidate(
+        title=title,
+        goal=goal,
+        in_scope=tuple(in_scope),
+        validation_focus=tuple(validation_focus),
+        triggering_findings=tuple(parsed_findings),
+    )
+
+
 def _parse_reason_list(value: object, *, field: str) -> tuple[RuntimeReason, ...] | None:
     if value is None:
         return ()
@@ -851,6 +1188,10 @@ def _coerce_str(value: object) -> str | None:
     if not normalized:
         return None
     return normalized
+
+
+def _is_list_of_strings(value: object) -> bool:
+    return isinstance(value, list) and all(isinstance(item, str) for item in value)
 
 
 def _parse_enum(value: object, enum_type: type[Enum]) -> Enum | None:

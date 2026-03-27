@@ -39,6 +39,10 @@ from ai_engineering_runtime.nodes.executor_dispatch import (
     ExecutorDispatchNode,
     ExecutorDispatchRequest,
 )
+from ai_engineering_runtime.nodes.executor_run_lifecycle import (
+    ExecutorRunLifecycleNode,
+    ExecutorRunLifecycleRequest,
+)
 from ai_engineering_runtime.nodes.followup_suggester import (
     FollowupSuggesterNode,
     FollowupSuggesterRequest,
@@ -59,6 +63,7 @@ from ai_engineering_runtime.run_logs import ArtifactTargetKind, ReplaySignalKind
 from ai_engineering_runtime.state import (
     CloseoutHint,
     DispatchMode,
+    ExecutorLifecycleAction,
     ExecutorTarget,
     ReadinessStatus,
     ValidationEvidenceStatus,
@@ -151,7 +156,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     executor_dispatch = subparsers.add_parser(
         "executor-dispatch",
-        help="Prepare or exercise a minimal shell-based handoff for a ready task spec.",
+        help="Prepare or dispatch a ready task spec through one executor adapter contract.",
     )
     executor_dispatch.add_argument("--spec", required=True, help="Path to the task spec Markdown file.")
     executor_dispatch.add_argument(
@@ -164,7 +169,30 @@ def build_parser() -> argparse.ArgumentParser:
         "--mode",
         choices=[mode.value for mode in DispatchMode],
         default=DispatchMode.PREVIEW.value,
-        help="Dispatch mode: preview or local echo.",
+        help="Dispatch mode: preview, shell echo proof, or adapter submit.",
+    )
+
+    executor_run_lifecycle = subparsers.add_parser(
+        "executor-run-lifecycle",
+        help="Revisit one previously dispatched executor run through poll or resume lifecycle actions.",
+    )
+    lifecycle_target = executor_run_lifecycle.add_mutually_exclusive_group(required=True)
+    lifecycle_target.add_argument("--log", help="Explicit path to a prior executor run log JSON file.")
+    lifecycle_target.add_argument("--run-id", help="Run id in <timestamp-node> form.")
+    lifecycle_target.add_argument(
+        "--latest",
+        action="store_true",
+        help="Select the latest matching run log under .runtime/runs/.",
+    )
+    executor_run_lifecycle.add_argument(
+        "--node",
+        help="Optional node-name filter when selecting with --latest.",
+    )
+    executor_run_lifecycle.add_argument(
+        "--action",
+        choices=[action.value for action in ExecutorLifecycleAction],
+        default=ExecutorLifecycleAction.POLL.value,
+        help="Lifecycle action to apply to the previously submitted executor run.",
     )
 
     plan_to_spec = subparsers.add_parser(
@@ -372,6 +400,7 @@ def main(
         "validation-collect",
         "followup-suggester",
         "executor-dispatch",
+        "executor-run-lifecycle",
         "plan-to-spec",
         "writeback-classifier",
         "result-log-replay",
@@ -438,6 +467,18 @@ def main(
                         spec_path=Path(args.spec),
                         target=_parse_executor_target(args.executor),
                         mode=_parse_dispatch_mode(args.mode),
+                    )
+                )
+            )
+        elif args.command == "executor-run-lifecycle":
+            result = engine.run(
+                ExecutorRunLifecycleNode(
+                    ExecutorRunLifecycleRequest(
+                        log_path=Path(args.log) if args.log else None,
+                        run_id=args.run_id,
+                        latest=bool(args.latest),
+                        node_name=args.node,
+                        action=_parse_executor_lifecycle_action(args.action),
                     )
                 )
             )
@@ -651,6 +692,19 @@ def _emit_result(result: RunResult, adapter: FileSystemAdapter, *, dry_run: bool
         print(f"Mode: {result.dispatch.mode.value}", file=stream)
         if result.dispatch.payload is not None:
             print(f"Handoff: {result.dispatch.payload.title}", file=stream)
+    if result.metadata.get("executor_lifecycle_action") is not None:
+        print(f"Lifecycle Action: {result.metadata['executor_lifecycle_action']}", file=stream)
+        if result.metadata.get("source_run_id") is not None:
+            print(f"Source Run: {result.metadata['source_run_id']}", file=stream)
+        if result.metadata.get("source_log_path") is not None:
+            print(f"Source Log: {result.metadata['source_log_path']}", file=stream)
+    if result.execution is not None:
+        print(f"Execution: {result.execution.final_status.value}", file=stream)
+        print(f"Execution Summary: {result.execution.summary}", file=stream)
+        if result.execution.changed_files:
+            print(f"Changed Files: {len(result.execution.changed_files)}", file=stream)
+        if result.execution.repair_spec_candidate is not None:
+            print(f"Repair Seed: {result.execution.repair_spec_candidate.title}", file=stream)
     if result.writeback is not None:
         print(f"Write-back: {result.writeback.destination.value}", file=stream)
         print(
@@ -684,6 +738,11 @@ def _emit_result(result: RunResult, adapter: FileSystemAdapter, *, dry_run: bool
         for reason in result.dispatch.reasons:
             printed_reasons.add((reason.code, reason.message, reason.field))
             print(f"- {reason.code}: {reason.message}", file=stream)
+    if result.execution is not None:
+        for finding in result.execution.findings:
+            identity = (finding.code, finding.message, finding.field)
+            printed_reasons.add(identity)
+            print(f"- {finding.severity.value}: {finding.code}: {finding.message}", file=stream)
     if result.writeback is not None:
         for reason in result.writeback.reasons:
             printed_reasons.add((reason.code, reason.message, reason.field))
@@ -774,6 +833,10 @@ def _parse_executor_target(value: str | None) -> ExecutorTarget:
 
 def _parse_dispatch_mode(value: str | None) -> DispatchMode:
     return DispatchMode(value or DispatchMode.PREVIEW.value)
+
+
+def _parse_executor_lifecycle_action(value: str | None) -> ExecutorLifecycleAction:
+    return ExecutorLifecycleAction(value or ExecutorLifecycleAction.POLL.value)
 
 
 def _parse_replay_signal_kind(value: str | None) -> ReplaySignalKind | None:

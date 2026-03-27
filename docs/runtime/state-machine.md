@@ -45,13 +45,22 @@ The current runtime slice implements the transitions below:
   happens when task-spec readiness is `blocked`, meaning required execution contract structure or status is invalid
 
 - `spec-ready` -> `spec-ready`
-  happens when executor dispatch runs in `preview` mode, meaning the handoff was prepared but not actually dispatched
+  happens when executor dispatch runs in `preview` mode, meaning the handoff was prepared, capability-checked, and held in the control plane without worker execution
 
 - `spec-ready` -> `executing`
-  happens when executor dispatch runs in `echo` mode for a ready task spec, meaning the control plane handed off the narrow payload to the local shell adapter
+  happens when executor dispatch runs in `echo` or `submit` mode for a ready and compatible task spec, meaning the control plane handed off the narrow payload to one executor adapter and captured a normalized execution result
 
 - `spec-ready` -> `blocked`
-  happens when executor dispatch rejects a non-ready task spec
+  happens when executor dispatch rejects a non-ready task spec, fails capability gating, or receives a blocking executor outcome
+
+- `executing` -> `executing`
+  happens when `executor-run-lifecycle` revisits a previously submitted run and the executor still reports a non-terminal outcome
+
+- `executing` -> `validating`
+  happens when `executor-run-lifecycle` revisits a previously submitted run and captures a terminal successful execution result that is ready for explicit validation handling
+
+- `executing` -> `blocked`
+  happens when executor-run revisit selection is invalid, resume is unsupported, or the revisited execution result ends in `failed` or `blocked`
 
 - `validating` -> `writeback-review`
   happens when validation collection returns `passed`, meaning required supplied validation evidence exists and no critical failures remain
@@ -76,12 +85,6 @@ The current runtime slice implements the transitions below:
 
 ## Planned next transitions
 
-- `spec-ready` -> `executing`
-  once a future executor-dispatch node is available
-
-- `executing` -> `validating`
-  once execution reports completion and required checks can run
-
 - `validating` -> `writeback-review`
   once required validation passes
 
@@ -96,5 +99,6 @@ The current runtime slice implements the transitions below:
 - no transition should silently widen scope
 - non-ready outcomes should report concrete readiness reason codes and messages
 - `needs_clarification` should keep the workflow in `planning`
+- executor capability mismatches should block dispatch before a worker-plane handoff happens
 - only explicit validation should move work beyond execution
 - future nodes should preserve the copied SOP boundary between plan, spec, implementation, and write-back

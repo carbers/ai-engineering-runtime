@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 import shutil
 import sys
@@ -38,6 +39,13 @@ def _copy_fixture(root: Path, fixture_name: str) -> Path:
     destination = root / ".runtime" / "runs" / fixture_name
     destination.parent.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(source, destination)
+    return destination
+
+
+def _write_run_log(root: Path, log_name: str, payload: dict[str, object]) -> Path:
+    destination = root / ".runtime" / "runs" / log_name
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    destination.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return destination
 
 
@@ -164,6 +172,129 @@ class RunLogReplayParsingTests(unittest.TestCase):
             self.assertEqual(replay.status, ReplayStatus.REJECTED)
             self.assertEqual(replay.reasons[0].code, "invalid-run-log-envelope")
 
+    def test_load_replay_result_rejects_invalid_execution_payload(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            invalid_path = _write_run_log(
+                root,
+                "20260327T120000000000-executor-dispatch.json",
+                {
+                    "node": "executor-dispatch",
+                    "success": True,
+                    "from_state": "spec-ready",
+                    "to_state": "executing",
+                    "plan_path": None,
+                    "spec_path": "docs/specs/20260327-001-executor-adapter-codex-v1.md",
+                    "output_path": None,
+                    "log_path": ".runtime/runs/20260327T120000000000-executor-dispatch.json",
+                    "rendered_output": None,
+                    "metadata": {},
+                    "issues": [],
+                    "readiness": None,
+                    "validation": None,
+                    "writeback": None,
+                    "followup": None,
+                    "dispatch": {
+                        "target": "codex",
+                        "status": "dispatched",
+                        "mode": "submit",
+                        "payload": {
+                            "title": "Dispatch Sample",
+                            "goal": "Hand off a narrow task safely.",
+                            "in_scope": ["prepare a handoff payload"],
+                            "done_when": "The control plane can prepare or echo a narrow task handoff.",
+                        },
+                        "reasons": [],
+                        "executor": None,
+                        "requirements": None,
+                        "execution_metadata": {},
+                    },
+                    "execution": {
+                        "summary": "missing required execution fields"
+                    },
+                },
+            )
+
+            replay = load_replay_result(invalid_path)
+
+            self.assertEqual(replay.status, ReplayStatus.REJECTED)
+            self.assertEqual(replay.reasons[0].code, "invalid-run-log-envelope")
+            self.assertEqual(replay.reasons[0].field, "execution")
+
+    def test_load_replay_result_rejects_invalid_dispatch_payload(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            invalid_path = _write_run_log(
+                root,
+                "20260327T120000000001-executor-dispatch.json",
+                {
+                    "node": "executor-dispatch",
+                    "success": True,
+                    "from_state": "spec-ready",
+                    "to_state": "executing",
+                    "plan_path": None,
+                    "spec_path": "docs/specs/20260327-001-executor-adapter-codex-v1.md",
+                    "output_path": None,
+                    "log_path": ".runtime/runs/20260327T120000000001-executor-dispatch.json",
+                    "rendered_output": None,
+                    "metadata": {},
+                    "issues": [],
+                    "readiness": None,
+                    "validation": None,
+                    "writeback": None,
+                    "followup": None,
+                    "dispatch": {
+                        "status": "dispatched",
+                    },
+                    "execution": {
+                        "executor": {
+                            "name": "codex",
+                            "type": "external-coding-agent",
+                            "version": "v1",
+                            "capabilities": {
+                                "can_edit_files": True,
+                                "can_run_shell": True,
+                                "can_open_repo_context": True,
+                                "can_return_patch": True,
+                                "can_return_commit": False,
+                                "can_run_tests": True,
+                                "can_do_review_only": True,
+                                "supports_noninteractive": True,
+                                "supports_resume": False,
+                            },
+                        },
+                        "spec_identity": "docs/specs/20260327-001-executor-adapter-codex-v1.md",
+                        "dispatch_summary": {
+                            "title": "Dispatch Sample",
+                            "goal": "Hand off a narrow task safely.",
+                            "in_scope": ["prepare a handoff payload"],
+                            "done_when": "The control plane can prepare or echo a narrow task handoff.",
+                        },
+                        "final_status": "running",
+                        "summary": "Executor run is still in progress.",
+                        "changed_files": [],
+                        "patch_ref": None,
+                        "branch_ref": None,
+                        "commit_ref": None,
+                        "stdout_summary": None,
+                        "stderr_summary": None,
+                        "log_summary": "Executor run is still in progress.",
+                        "validations_claimed": [],
+                        "uncovered_items": [],
+                        "suggested_followups": [],
+                        "raw_artifact_refs": [],
+                        "findings": [],
+                        "repair_spec_candidate": None,
+                    },
+                },
+            )
+
+            replay = load_replay_result(invalid_path)
+
+            self.assertEqual(replay.status, ReplayStatus.REJECTED)
+            self.assertEqual(replay.reasons[0].code, "invalid-run-log-envelope")
+            self.assertEqual(replay.reasons[0].field, "dispatch")
+
     def test_select_latest_run_log_returns_newest_by_filename_timestamp(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
@@ -179,5 +310,3 @@ class RunLogReplayParsingTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-
-

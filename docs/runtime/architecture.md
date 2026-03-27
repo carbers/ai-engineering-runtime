@@ -31,7 +31,7 @@ The copied SOP remains the development operating model. The runtime consumes the
   Narrow executable workflow steps such as `plan-to-spec`
 
 - `adapters`
-  Filesystem and future external executor integrations
+  Filesystem and external executor integrations behind a narrow adapter contract
 
 - `engine`
   Small node runner and run/result handling
@@ -41,14 +41,22 @@ The copied SOP remains the development operating model. The runtime consumes the
 
 ## Current slice boundary
 
-The current implemented slice provides only enough runtime to check plan readiness and compile a durable plan into a draft task spec:
+The current implemented slice now spans the narrow control-plane path from artifact readiness through executor handoff, validation closeout packaging, and follow-up suggestion:
 
 - plan and artifact discovery
 - Markdown contract parsing
-- plan readiness classification for `ready`, `needs_clarification`, and `blocked`
-- workflow-state transitions from `planning` to `planning`, `spec-ready`, or `blocked`
+- plan and task-spec readiness classification
+- workflow-state transitions across readiness, dispatch, validation, write-back review, and closeout suggestion
 - draft spec rendering
-- JSON run logging
-- CLI invocation through `ae-runtime plan-readiness-check` and `ae-runtime plan-to-spec`
+- adapter-backed executor dispatch with capability gating
+- explicit revisit of previously submitted executor runs through a narrow lifecycle node
+- a minimal Codex adapter v1 with a mockable backend seam
+- normalized execution results, findings, and repair-spec seeds for later review loops
+- JSON run logging and summary materialization
+- CLI invocation through the currently implemented runtime commands
 
-Future slices may add executor dispatch, validation ingestion, and write-back suggestions, but they are intentionally not part of this landing.
+The runtime still stops at orchestration boundaries:
+
+- it prepares and routes narrow work to executors
+- it records normalized execution outputs and follow-up inputs
+- it does not replace the external coding agent, perform autonomous review loops, or automate commits/write-back

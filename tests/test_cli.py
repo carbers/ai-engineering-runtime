@@ -423,6 +423,208 @@ class CliTests(unittest.TestCase):
             self.assertIn("Executor: shell", stdout.getvalue())
             self.assertIn("Mode: preview", stdout.getvalue())
 
+    def test_executor_dispatch_reports_codex_execution_for_ready_task_spec(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            task_spec = """
+            # Codex Dispatch Sample
+
+            ## Metadata
+
+            ### Source Plan / Request
+            `docs/runtime/roadmap.md`
+
+            ### Status
+            `in-progress`
+
+            ### Related Specs
+            None.
+
+            ## Goal
+            Hand off a narrow executor task safely.
+
+            ## In Scope
+            - prepare a codex handoff
+
+            ## Out of Scope
+            - live backend wiring
+
+            ## Affected Area
+            - `src/ai_engineering_runtime/nodes/executor_dispatch.py`
+
+            ## Task Checklist
+            - [ ] prepare the codex handoff
+
+            ## Done When
+            The control plane can submit a normalized executor task.
+
+            ## Validation
+
+            ### Black-box Checks
+            - ready spec can dispatch
+
+            ### White-box Needed
+            Yes
+
+            ### White-box Trigger
+            Executor handoff and normalization are contract-sensitive.
+
+            ### Internal Logic To Protect
+            - adapter selection
+            - execution result normalization
+
+            ## Executor Requirements
+
+            ### can_edit_files
+            Yes
+
+            ### can_open_repo_context
+            Yes
+
+            ## Write-back Needed
+            No
+
+            ## Risks / Notes
+            - keep it small
+            """
+            _write_repo_file(root, "docs/specs/20260322-999-codex-dispatch.md", task_spec)
+
+            stdout = io.StringIO()
+            stderr = io.StringIO()
+            with redirect_stdout(stdout), redirect_stderr(stderr):
+                exit_code = main(
+                    [
+                        "executor-dispatch",
+                        "--spec",
+                        "docs/specs/20260322-999-codex-dispatch.md",
+                        "--executor",
+                        "codex",
+                        "--mode",
+                        "submit",
+                    ],
+                    repo_root=root,
+                    today=date(2026, 3, 27),
+                )
+
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(stderr.getvalue(), "")
+            self.assertIn("Dispatch: dispatched", stdout.getvalue())
+            self.assertIn("Executor: codex", stdout.getvalue())
+            self.assertIn("Mode: submit", stdout.getvalue())
+            self.assertIn("Execution: succeeded", stdout.getvalue())
+            self.assertIn("Execution Summary:", stdout.getvalue())
+
+    def test_executor_run_lifecycle_reports_polled_codex_execution(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            task_spec = """
+            # Codex Dispatch Sample
+
+            ## Metadata
+
+            ### Source Plan / Request
+            `docs/runtime/roadmap.md`
+
+            ### Status
+            `in-progress`
+
+            ### Related Specs
+            None.
+
+            ## Goal
+            Hand off a narrow executor task safely.
+
+            ## In Scope
+            - prepare a codex handoff
+
+            ## Out of Scope
+            - live backend wiring
+
+            ## Affected Area
+            - `src/ai_engineering_runtime/nodes/executor_dispatch.py`
+
+            ## Task Checklist
+            - [ ] prepare the codex handoff
+
+            ## Done When
+            The control plane can submit a normalized executor task.
+
+            ## Validation
+
+            ### Black-box Checks
+            - ready spec can dispatch
+
+            ### White-box Needed
+            Yes
+
+            ### White-box Trigger
+            Executor handoff and normalization are contract-sensitive.
+
+            ### Internal Logic To Protect
+            - adapter selection
+            - execution result normalization
+
+            ## Executor Requirements
+
+            ### can_edit_files
+            Yes
+
+            ### can_open_repo_context
+            Yes
+
+            ## Write-back Needed
+            No
+
+            ## Risks / Notes
+            - keep it small
+            """
+            _write_repo_file(root, "docs/specs/20260322-999-codex-dispatch.md", task_spec)
+
+            dispatch_stdout = io.StringIO()
+            dispatch_stderr = io.StringIO()
+            with redirect_stdout(dispatch_stdout), redirect_stderr(dispatch_stderr):
+                dispatch_exit = main(
+                    [
+                        "executor-dispatch",
+                        "--spec",
+                        "docs/specs/20260322-999-codex-dispatch.md",
+                        "--executor",
+                        "codex",
+                        "--mode",
+                        "submit",
+                    ],
+                    repo_root=root,
+                    today=date(2026, 3, 27),
+                )
+
+            self.assertEqual(dispatch_exit, 0)
+            dispatch_logs = sorted((root / ".runtime" / "runs").glob("*-executor-dispatch.json"))
+            self.assertTrue(dispatch_logs)
+            source_run_id = dispatch_logs[-1].stem
+
+            stdout = io.StringIO()
+            stderr = io.StringIO()
+            with redirect_stdout(stdout), redirect_stderr(stderr):
+                exit_code = main(
+                    [
+                        "executor-run-lifecycle",
+                        "--run-id",
+                        source_run_id,
+                        "--action",
+                        "poll",
+                    ],
+                    repo_root=root,
+                    today=date(2026, 3, 27),
+                )
+
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(stderr.getvalue(), "")
+            self.assertIn("executor-run-lifecycle completed", stdout.getvalue())
+            self.assertIn("Lifecycle Action: poll", stdout.getvalue())
+            self.assertIn(f"Source Run: {source_run_id}", stdout.getvalue())
+            self.assertIn("Execution: succeeded", stdout.getvalue())
+            self.assertIn("State: validating", stdout.getvalue())
+
     def test_main_reports_success_and_writes_spec(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
@@ -802,5 +1004,4 @@ class CliTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-
 

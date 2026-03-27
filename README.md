@@ -15,7 +15,9 @@ This repository establishes a practical runtime layer that can:
 5. collect validation results
 6. suggest write-back and follow-up work
 
-The current implementation is intentionally smaller than that full direction: one stdlib-only Python CLI, fourteen real nodes, and one documented contract for checking plan readiness, checking task-spec readiness, compiling a plan into a narrow draft task spec, aggregating validation evidence, classifying closeout write-back candidates, suggesting the next control-plane action, preparing a minimal shell-based executor handoff, reconstructing replay-friendly outcomes from prior run logs, selecting replayable relevant history, materializing stable run summaries, evaluating downstream node eligibility, rolling up validation outcomes, and packaging write-back and follow-up review artifacts.
+The current implementation is intentionally smaller than that full direction: one stdlib-only Python CLI, fifteen real nodes, and one documented contract for checking plan readiness, checking task-spec readiness, compiling a plan into a narrow draft task spec, aggregating validation evidence, classifying closeout write-back candidates, suggesting the next control-plane action, preparing a minimal shell-based executor handoff, revisiting one previously submitted executor run, reconstructing replay-friendly outcomes from prior run logs, selecting replayable relevant history, materializing stable run summaries, evaluating downstream node eligibility, rolling up validation outcomes, and packaging write-back and follow-up review artifacts.
+
+The current implementation now also includes a vendor-neutral executor adapter contract, capability gating, a minimal Codex adapter v1 with a mockable backend seam, and normalized execution results that preserve the boundary of `runtime = control plane` and `executor = worker plane`.
 
 ## What stays the same
 
@@ -65,6 +67,8 @@ ae-runtime validation-collect --spec docs/specs/20260322-003-writeback-classifie
 ae-runtime writeback-classifier --text "..." --kind workflow_pattern
 ae-runtime followup-suggester --validation-status failed
 ae-runtime executor-dispatch --spec docs/specs/20260322-007-executor-dispatch-adapter-shell.md --mode preview
+ae-runtime executor-dispatch --spec docs/specs/20260327-001-executor-adapter-codex-v1.md --executor codex --mode submit
+ae-runtime executor-run-lifecycle --run-id 20260327T120000000000-executor-dispatch --action poll
 ae-runtime result-log-replay --latest --node validation-collect
 ae-runtime run-history-select --spec docs/specs/20260322-005-validation-collect-foundation.md --node validation-collect
 ae-runtime run-summary --latest --node validation-collect
@@ -97,7 +101,10 @@ These commands currently:
 - aggregate supplied validation evidence as `passed`, `failed`, or `incomplete`
 - classify write-back candidates as `facts`, `skills`, `change_summary_only`, or `ignore`
 - suggest a single next control-plane action from readiness, validation, write-back, and closeout signals
-- prepare or exercise a minimal shell-based dispatch handoff for ready task specs
+- prepare or dispatch a ready task spec through a vendor-neutral executor adapter contract
+- capability-check a task against one executor adapter before handoff
+- normalize executor outputs into a structured execution result with findings and repair-spec seed hints
+- revisit one previously submitted executor run through an explicit poll or resume lifecycle path without redispatching the original task
 - inspect one prior run log at a time and normalize its recorded signal as replay-oriented context
 - select replayable prior runs relevant to one exact artifact target
 - project compact history signals and canonical terminal state into stable run summaries
@@ -108,6 +115,10 @@ These commands currently:
 - write a JSON run summary under `.runtime/summaries/`
 
 The runtime creates the `.runtime/` directory tree on demand when one of those artifacts is first materialized.
+
+Task specs may optionally declare `## Executor Requirements` using capability fields such as `can_edit_files`, `can_run_shell`, `can_open_repo_context`, `can_return_patch`, `can_return_commit`, `can_run_tests`, `can_do_review_only`, `supports_noninteractive`, and `supports_resume`.
+If declared, `executor-dispatch` will block incompatible adapters before worker-plane handoff.
+`executor-run-lifecycle` can then revisit a previously submitted run log and either keep the workflow in `executing` or advance it toward `validating` once a terminal execution result is available.
 
 ## Local validation
 

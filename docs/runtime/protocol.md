@@ -141,12 +141,68 @@ It currently supports these suggestion outcomes:
 
 ## Executor dispatch rules
 
-The executor-dispatch slice stays in the control plane:
+The executor-dispatch slice stays in the control plane even when it talks to a real worker-plane adapter:
 
 - it requires a `ready` task spec before handoff
-- it shapes a narrow payload summary from the task spec
-- `preview` shows the prepared handoff without executing anything
-- `echo` proves local shell dispatch plumbing without integrating a real worker-plane executor
+- it shapes a narrow payload summary from the task spec rather than forwarding the full repository as implicit context
+- it selects one executor adapter by target and drives that adapter through a narrow contract:
+  - `prepare(spec, context)`
+  - `dispatch(payload)`
+  - `restore_handle(dispatch_result)`
+  - `poll(handle)`
+  - `resume(handle)`
+  - `collect(handle)`
+  - `normalize(...)`
+- `preview` shows the prepared handoff without worker execution
+- `echo` remains a safe local shell proof path
+- `submit` is the first worker-plane-capable mode for adapter-backed execution
+- dispatch now applies capability gating before handoff when the task spec declares `## Executor Requirements`
+
+`## Executor Requirements` is currently optional for task specs.
+When present, its `###` fields may declare capability requirements such as:
+
+- `can_edit_files`
+- `can_run_shell`
+- `can_open_repo_context`
+- `can_return_patch`
+- `can_return_commit`
+- `can_run_tests`
+- `can_do_review_only`
+- `supports_noninteractive`
+- `supports_resume`
+
+The first implemented adapters are:
+
+- `shell`
+  local proof-path adapter for `preview` and `echo`
+
+- `codex`
+  minimal adapter v1 with a mockable backend seam and normalized execution result output
+
+Executor dispatch persists both:
+
+- a dispatch result that records target, mode, payload summary, requirements, capability-gate reasons, and submission metadata
+- a normalized execution result that records executor metadata, final status, changed files, patch or commit references when available, validation claims, uncovered items, follow-up hints, raw output references, and normalized findings
+
+Execution results may also include a repair-spec seed.
+That seed is a protocol-level handoff for later `review -> findings -> narrow fix spec -> re-dispatch` evolution and is not an automatic task creator.
+
+## Executor run lifecycle rules
+
+- `executor-run-lifecycle` revisits one previously submitted executor run by selecting an existing run log rather than redispatching the original task
+- lifecycle selection supports:
+  - explicit run-log path
+  - run id
+  - latest run-log selection with optional node filter
+- the selected run log must already contain both a structured dispatch result and a structured execution result
+- lifecycle actions are currently:
+  - `poll`
+  - `resume`
+- `resume` is capability-gated and must reject adapters that do not declare `supports_resume`
+- a non-terminal lifecycle poll keeps the workflow in `executing`
+- a terminal successful lifecycle result can move the workflow to `validating`
+- terminal failed or blocked lifecycle results move the workflow to `blocked`
+- lifecycle stays a control-plane revisit path only; it does not create a second dispatch or start autonomous polling loops
 
 ## Run-log replay rules
 
@@ -244,5 +300,5 @@ The run-log replay slice also stays in the control plane:
 ## Support level in this pass
 
 - fully supported: discovery and parsing for the canonical roadmap plan, task specs, facts, and skills
-- executable support: `plan-readiness-check`, `task-spec-readiness-check`, `plan` -> `task-spec`, `validation-collect`, `writeback-classifier`, `followup-suggester`, `executor-dispatch`, `result-log-replay`, `run-history-select`, `run-summary`, `node-gate`, `validation-rollup`, `writeback-package`, and `followup-package`
-- internal normalized support: exact replay-backed history selection, compact replay-signal projection, canonical terminal-state resolution, artifact refs, static node contracts, and stable package artifacts
+- executable support: `plan-readiness-check`, `task-spec-readiness-check`, `plan` -> `task-spec`, `validation-collect`, `writeback-classifier`, `followup-suggester`, `executor-dispatch`, `executor-run-lifecycle`, `result-log-replay`, `run-history-select`, `run-summary`, `node-gate`, `validation-rollup`, `writeback-package`, and `followup-package`
+- internal normalized support: exact replay-backed history selection, compact replay-signal projection, canonical terminal-state resolution, adapter-backed execution results, repair-spec seeds, artifact refs, static node contracts, and stable package artifacts
