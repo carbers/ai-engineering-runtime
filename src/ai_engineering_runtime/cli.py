@@ -8,6 +8,7 @@ from typing import Sequence
 
 from ai_engineering_runtime.adapters import FileSystemAdapter
 from ai_engineering_runtime.engine import RunResult, RuntimeEngine
+from ai_engineering_runtime.handoffs import IntakeSourceKind, compile_handoff, load_handoff, validate_handoff
 from ai_engineering_runtime.nodes.plan_readiness_check import (
     PlanReadinessCheckNode,
     PlanReadinessCheckRequest,
@@ -59,6 +60,15 @@ from ai_engineering_runtime.nodes.writeback_classifier import (
     WritebackClassifierNode,
     WritebackClassifierRequest,
 )
+from ai_engineering_runtime.product_runtime import (
+    close_run,
+    inspect_run,
+    preview_run_from_handoff,
+    render_state_summary,
+    resume_run,
+    retry_run,
+    run_from_handoff,
+)
 from ai_engineering_runtime.run_logs import ArtifactTargetKind, ReplaySignalKind
 from ai_engineering_runtime.state import (
     CloseoutHint,
@@ -66,6 +76,7 @@ from ai_engineering_runtime.state import (
     ExecutorLifecycleAction,
     ExecutorTarget,
     ReadinessStatus,
+    RuntimeReason,
     ValidationEvidenceStatus,
     ValidationStatus,
     WritebackCandidateKind,
@@ -75,10 +86,77 @@ from ai_engineering_runtime.state import (
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="ae-runtime",
-        description="CLI-first workflow runtime for SOP artifacts.",
+        prog="ae",
+        description="AI workflow runtime control plane with product-oriented intake and orchestration paths.",
     )
     subparsers = parser.add_subparsers(dest="command")
+
+    run_parser = subparsers.add_parser(
+        "run",
+        help="Run the product control plane from chat, prompt, or handoff input.",
+    )
+    run_source = run_parser.add_mutually_exclusive_group(required=True)
+    run_source.add_argument("--from-chat", help="Path to a chat-style plain text input file.")
+    run_source.add_argument("--from-prompt", help="Path to a prompt-style plain text input file.")
+    run_source.add_argument("--from-handoff", help="Path to a normalized handoff JSON file.")
+    run_parser.add_argument("--workflow", help="Optional workflow override.")
+    run_parser.add_argument(
+        "--preview-handoff",
+        action="store_true",
+        help="Compile and preview the handoff and run-state interpretation without creating or mutating a product run.",
+    )
+    run_parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Preview the compiled handoff and next legal actions without dispatching or persisting the run.",
+    )
+
+    compile_handoff_parser = subparsers.add_parser(
+        "compile-handoff",
+        help="Compile chat, prompt, or handoff input into a normalized handoff document.",
+    )
+    compile_source = compile_handoff_parser.add_mutually_exclusive_group(required=True)
+    compile_source.add_argument("--from-chat", help="Path to a chat-style plain text input file.")
+    compile_source.add_argument("--from-prompt", help="Path to a prompt-style plain text input file.")
+    compile_source.add_argument("--from-handoff", help="Path to an existing handoff JSON file.")
+    compile_handoff_parser.add_argument("--workflow", help="Optional workflow hint or override.")
+    compile_handoff_parser.add_argument("--out", help="Optional output path for the compiled handoff JSON.")
+    compile_handoff_parser.add_argument(
+        "--preview",
+        action="store_true",
+        help="Render a detailed compile preview with defaults, warnings, and candidate actions.",
+    )
+
+    validate_handoff_parser = subparsers.add_parser(
+        "validate-handoff",
+        help="Validate one normalized handoff JSON document.",
+    )
+    validate_handoff_parser.add_argument("--handoff", required=True, help="Path to a handoff JSON file.")
+
+    inspect_parser = subparsers.add_parser(
+        "inspect",
+        help="Inspect one product run and show current gates, lanes, and next-step decisions.",
+    )
+    inspect_parser.add_argument("run_id", help="Product run id.")
+
+    resume_parser = subparsers.add_parser(
+        "resume",
+        help="Re-evaluate one product run and refresh its next-step decision.",
+    )
+    resume_parser.add_argument("run_id", help="Product run id.")
+
+    retry_parser = subparsers.add_parser(
+        "retry",
+        help="Retry one product run node using retry and fallback policy.",
+    )
+    retry_parser.add_argument("run_id", help="Product run id.")
+    retry_parser.add_argument("--node", required=True, help="Workflow node id to retry.")
+
+    close_parser = subparsers.add_parser(
+        "close",
+        help="Attempt closeout for one product run.",
+    )
+    close_parser.add_argument("run_id", help="Product run id.")
 
     plan_readiness = subparsers.add_parser(
         "plan-readiness-check",
@@ -395,6 +473,13 @@ def main(
     parser = build_parser()
     args = parser.parse_args(argv)
     if args.command not in {
+        "run",
+        "compile-handoff",
+        "validate-handoff",
+        "inspect",
+        "resume",
+        "retry",
+        "close",
         "plan-readiness-check",
         "task-spec-readiness-check",
         "validation-collect",
@@ -415,6 +500,9 @@ def main(
         return 1
 
     adapter = FileSystemAdapter(repo_root or Path.cwd())
+    if args.command in {"run", "compile-handoff", "validate-handoff", "inspect", "resume", "retry", "close"}:
+        return _run_product_command(args, adapter)
+
     engine = RuntimeEngine(adapter)
     dry_run = False
     try:
@@ -589,6 +677,80 @@ def main(
         return 1
 
     _emit_result(result, adapter, dry_run=dry_run)
+    return 0 if result.success else 1
+
+
+def _run_product_command(args: argparse.Namespace, adapter: FileSystemAdapter) -> int:
+    if args.command == "compile-handoff":
+        handoff, reasons = _resolve_handoff_from_args(adapter, args)
+        if handoff is None:
+            _emit_runtime_reasons("compile-handoff failed", reasons)
+            return 1
+        preview_state = None
+        if args.preview:
+            preview_result = preview_run_from_handoff(adapter, handoff, force_workflow_id=args.workflow)
+            preview_state = preview_result.state
+        if args.out:
+            output_path = adapter.resolve(Path(args.out))
+            adapter.write_json(output_path, handoff.to_record())
+        _emit_handoff_summary(
+            handoff,
+            adapter,
+            output_path=Path(args.out) if args.out else None,
+            preview=args.preview,
+            preview_state=preview_state,
+        )
+        return 0
+
+    if args.command == "validate-handoff":
+        handoff_path = adapter.resolve(Path(args.handoff))
+        try:
+            handoff = load_handoff(handoff_path)
+        except (OSError, ValueError) as error:
+            _emit_runtime_error("validate-handoff", error)
+            return 1
+        reasons = validate_handoff(handoff)
+        if reasons:
+            _emit_runtime_reasons("validate-handoff failed", reasons)
+            return 1
+        preview_result = preview_run_from_handoff(adapter, handoff)
+        _emit_handoff_summary(handoff, adapter, output_path=handoff_path, preview=True, preview_state=preview_result.state)
+        return 0
+
+    if args.command == "run":
+        handoff, reasons = _resolve_handoff_from_args(adapter, args)
+        if handoff is None:
+            _emit_runtime_reasons("run failed", reasons)
+            return 1
+        if args.preview_handoff or args.dry_run:
+            preview_result = preview_run_from_handoff(adapter, handoff, force_workflow_id=args.workflow)
+            _emit_handoff_summary(handoff, adapter, output_path=None, preview=True, preview_state=preview_result.state)
+            if preview_result.state is not None:
+                print("")
+                print("run preview")
+                print(render_state_summary(preview_result.state))
+            return 0 if preview_result.success else 1
+        result = run_from_handoff(adapter, handoff, force_workflow_id=args.workflow)
+        _emit_product_result("run", result)
+        return 0 if result.success else 1
+
+    if args.command == "inspect":
+        result = inspect_run(adapter, args.run_id)
+        _emit_product_result("inspect", result)
+        return 0 if result.success else 1
+
+    if args.command == "resume":
+        result = resume_run(adapter, args.run_id)
+        _emit_product_result("resume", result)
+        return 0 if result.success else 1
+
+    if args.command == "retry":
+        result = retry_run(adapter, args.run_id, args.node)
+        _emit_product_result("retry", result)
+        return 0 if result.success else 1
+
+    result = close_run(adapter, args.run_id)
+    _emit_product_result("close", result)
     return 0 if result.success else 1
 
 
@@ -781,6 +943,98 @@ def _emit_result(result: RunResult, adapter: FileSystemAdapter, *, dry_run: bool
 def _emit_runtime_error(command_name: str, error: OSError) -> None:
     print(f"{command_name} failed", file=sys.stderr)
     print(f"- runtime-io-error: {_format_os_error(error)}", file=sys.stderr)
+
+
+def _emit_runtime_reasons(status_line: str, reasons: tuple[RuntimeReason, ...]) -> None:
+    print(status_line, file=sys.stderr)
+    for reason in reasons:
+        print(f"- {reason.code}: {reason.message}", file=sys.stderr)
+
+
+def _emit_handoff_summary(
+    handoff,
+    adapter: FileSystemAdapter,
+    *,
+    output_path: Path | None,
+    preview: bool = False,
+    preview_state=None,
+) -> None:
+    print("handoff ready")
+    print(f"Workflow: {handoff.workflow_id}")
+    print(f"Intake Profile: {handoff.intake_profile.value}")
+    print(f"Request: {handoff.request_summary}")
+    print(f"Normalized Objective: {handoff.normalized_objective.splitlines()[0]}")
+    print(f"Lanes: {len(handoff.lanes)}")
+    if handoff.phase_hint is not None:
+        print(f"Phase Hint: {handoff.phase_hint}")
+    if handoff.lane_hint is not None:
+        print(f"Lane Hint: {handoff.lane_hint}")
+    if handoff.required_artifacts:
+        print("Required Artifacts: " + ", ".join(artifact.name for artifact in handoff.required_artifacts))
+    if handoff.defaults_applied:
+        print("Defaults Applied: " + "; ".join(handoff.defaults_applied))
+    if handoff.warnings:
+        print("Warnings: " + "; ".join(handoff.warnings))
+    if handoff.constraints:
+        print("Constraints: " + "; ".join(handoff.constraints))
+    if output_path is not None:
+        print(f"Handoff: {adapter.display_path(adapter.resolve(output_path))}")
+    if preview and preview_state is not None:
+        print("Candidate Actions: " + ", ".join(preview_state.decision.next_legal_actions))
+        print(f"Default Action: {preview_state.decision.default_action}")
+        if preview_state.decision.why_not_auto_advance is not None:
+            print(f"Why Not Auto Advance: {preview_state.decision.why_not_auto_advance}")
+
+
+def _emit_product_result(command_name: str, result) -> None:
+    stream = sys.stdout if result.success else sys.stderr
+    if result.state is None:
+        _emit_runtime_reasons(f"{command_name} failed", result.reasons)
+        return
+    print(f"{command_name} completed" if result.success else f"{command_name} failed", file=stream)
+    print(render_state_summary(result.state), file=stream)
+    print(f"Product Run: {result.state.run_id}", file=stream)
+    if command_name in {"retry", "resume", "close"} and result.state.decision.why_not_auto_advance is not None:
+        print(f"Action Context: {result.state.decision.why_not_auto_advance}", file=stream)
+    for reason in result.reasons:
+        print(f"- {reason.code}: {reason.message}", file=stream)
+
+
+def _resolve_handoff_from_args(
+    adapter: FileSystemAdapter,
+    args: argparse.Namespace,
+):
+    try:
+        if getattr(args, "from_handoff", None):
+            handoff = load_handoff(adapter.resolve(Path(args.from_handoff)))
+            reasons = validate_handoff(handoff)
+            if reasons:
+                return None, reasons
+            return handoff, ()
+        source_kind, source_path = _parse_intake_source(args)
+        resolved_path = adapter.resolve(source_path)
+        raw_text = adapter.read_text(resolved_path)
+        handoff = compile_handoff(
+            text=raw_text,
+            source_kind=source_kind,
+            repo_root=adapter.repo_root,
+            source_path=resolved_path,
+            workflow_hint=getattr(args, "workflow", None),
+        )
+        reasons = validate_handoff(handoff)
+        if reasons:
+            return None, reasons
+        return handoff, ()
+    except (OSError, ValueError) as error:
+        return None, (RuntimeReason(code="handoff-resolution-failed", message=str(error)),)
+
+
+def _parse_intake_source(args: argparse.Namespace) -> tuple[IntakeSourceKind, Path]:
+    if getattr(args, "from_chat", None):
+        return IntakeSourceKind.CHAT, Path(args.from_chat)
+    if getattr(args, "from_prompt", None):
+        return IntakeSourceKind.PROMPT, Path(args.from_prompt)
+    raise ValueError("One intake source is required.")
 
 
 def _format_os_error(error: OSError) -> str:

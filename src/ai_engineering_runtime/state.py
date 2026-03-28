@@ -47,8 +47,12 @@ class ExecutorCapabilityProfile:
     can_return_patch: bool = False
     can_return_commit: bool = False
     can_run_tests: bool = False
+    can_review: bool = False
+    can_generate_docs: bool = False
+    can_score_or_judge: bool = False
     can_do_review_only: bool = False
     supports_noninteractive: bool = False
+    supports_retry: bool = False
     supports_resume: bool = False
 
     def to_record(self) -> dict[str, bool]:
@@ -59,8 +63,12 @@ class ExecutorCapabilityProfile:
             "can_return_patch": self.can_return_patch,
             "can_return_commit": self.can_return_commit,
             "can_run_tests": self.can_run_tests,
+            "can_review": self.can_review,
+            "can_generate_docs": self.can_generate_docs,
+            "can_score_or_judge": self.can_score_or_judge,
             "can_do_review_only": self.can_do_review_only,
             "supports_noninteractive": self.supports_noninteractive,
+            "supports_retry": self.supports_retry,
             "supports_resume": self.supports_resume,
         }
 
@@ -73,8 +81,12 @@ class ExecutorRequirements:
     can_return_patch: bool = False
     can_return_commit: bool = False
     can_run_tests: bool = False
+    can_review: bool = False
+    can_generate_docs: bool = False
+    can_score_or_judge: bool = False
     can_do_review_only: bool = False
     supports_noninteractive: bool = False
+    supports_retry: bool = False
     supports_resume: bool = False
 
     def to_record(self) -> dict[str, bool]:
@@ -85,8 +97,12 @@ class ExecutorRequirements:
             "can_return_patch": self.can_return_patch,
             "can_return_commit": self.can_return_commit,
             "can_run_tests": self.can_run_tests,
+            "can_review": self.can_review,
+            "can_generate_docs": self.can_generate_docs,
+            "can_score_or_judge": self.can_score_or_judge,
             "can_do_review_only": self.can_do_review_only,
             "supports_noninteractive": self.supports_noninteractive,
+            "supports_retry": self.supports_retry,
             "supports_resume": self.supports_resume,
         }
 
@@ -116,6 +132,13 @@ class ReviewFindingSeverity(str, Enum):
     BLOCKING = "blocking"
 
 
+class ReviewFindingStatus(str, Enum):
+    OPEN = "open"
+    REPAIRED = "repaired"
+    CLOSED = "closed"
+    ESCALATED = "escalated"
+
+
 @dataclass(frozen=True)
 class ReviewFinding:
     code: str
@@ -123,18 +146,108 @@ class ReviewFinding:
     severity: ReviewFindingSeverity
     field: str | None = None
     source: str | None = None
+    category: str = "quality"
+    scope: str = "task"
+    affected_files: tuple[str, ...] = ()
+    affected_artifacts: tuple[str, ...] = ()
+    evidence: tuple[str, ...] = ()
+    blocking: bool | None = None
+    status: ReviewFindingStatus = ReviewFindingStatus.OPEN
+    suggested_fix_kind: str = "repair"
+    finding_id: str | None = None
 
-    def to_record(self) -> dict[str, str]:
-        payload = {
+    @property
+    def summary(self) -> str:
+        return self.message
+
+    @property
+    def normalized_finding_id(self) -> str:
+        return self.finding_id or self.code
+
+    @property
+    def is_blocking(self) -> bool:
+        if self.blocking is not None:
+            return self.blocking
+        return self.severity is ReviewFindingSeverity.BLOCKING
+
+    def to_record(self) -> dict[str, object]:
+        payload: dict[str, object] = {
             "code": self.code,
             "message": self.message,
+            "finding_id": self.normalized_finding_id,
+            "summary": self.summary,
             "severity": self.severity.value,
+            "category": self.category,
+            "scope": self.scope,
+            "affected_files": list(self.affected_files),
+            "affected_artifacts": list(self.affected_artifacts),
+            "evidence": list(self.evidence),
+            "blocking": self.is_blocking,
+            "status": self.status.value,
+            "suggested_fix_kind": self.suggested_fix_kind,
         }
         if self.field is not None:
             payload["field"] = self.field
         if self.source is not None:
             payload["source"] = self.source
         return payload
+
+    @classmethod
+    def from_record(cls, value: object) -> "ReviewFinding" | None:
+        if not isinstance(value, dict):
+            return None
+        code = value.get("code") or value.get("finding_id")
+        message = value.get("message") or value.get("summary")
+        severity = value.get("severity")
+        field = value.get("field")
+        source = value.get("source")
+        category = value.get("category", "quality")
+        scope = value.get("scope", "task")
+        affected_files = value.get("affected_files", [])
+        affected_artifacts = value.get("affected_artifacts", [])
+        evidence = value.get("evidence", [])
+        blocking = value.get("blocking")
+        status = value.get("status", ReviewFindingStatus.OPEN.value)
+        suggested_fix_kind = value.get("suggested_fix_kind", "repair")
+        finding_id = value.get("finding_id")
+        if not isinstance(code, str) or not isinstance(message, str) or not isinstance(severity, str):
+            return None
+        if field is not None and not isinstance(field, str):
+            return None
+        if source is not None and not isinstance(source, str):
+            return None
+        if not isinstance(category, str) or not isinstance(scope, str):
+            return None
+        for items in (affected_files, affected_artifacts, evidence):
+            if not isinstance(items, list) or not all(isinstance(item, str) for item in items):
+                return None
+        if blocking is not None and not isinstance(blocking, bool):
+            return None
+        if not isinstance(suggested_fix_kind, str):
+            return None
+        if finding_id is not None and not isinstance(finding_id, str):
+            return None
+        try:
+            parsed_severity = ReviewFindingSeverity(severity)
+            parsed_status = ReviewFindingStatus(status)
+        except ValueError:
+            return None
+        return cls(
+            code=code,
+            message=message,
+            severity=parsed_severity,
+            field=field,
+            source=source,
+            category=category,
+            scope=scope,
+            affected_files=tuple(affected_files),
+            affected_artifacts=tuple(affected_artifacts),
+            evidence=tuple(evidence),
+            blocking=blocking,
+            status=parsed_status,
+            suggested_fix_kind=suggested_fix_kind,
+            finding_id=finding_id,
+        )
 
 
 @dataclass(frozen=True)
@@ -156,6 +269,13 @@ class RepairSpecCandidate:
     in_scope: tuple[str, ...]
     validation_focus: tuple[str, ...] = ()
     triggering_findings: tuple[ReviewFinding, ...] = ()
+    source_finding_ids: tuple[str, ...] = ()
+    repair_objective: str | None = None
+    allowed_scope: tuple[str, ...] = ()
+    forbidden_expansion: tuple[str, ...] = ()
+    success_criteria: tuple[str, ...] = ()
+    validation_expectation: tuple[str, ...] = ()
+    repair_round: int = 0
 
     def to_record(self) -> dict[str, object]:
         return {
@@ -164,7 +284,68 @@ class RepairSpecCandidate:
             "in_scope": list(self.in_scope),
             "validation_focus": list(self.validation_focus),
             "triggering_findings": [finding.to_record() for finding in self.triggering_findings],
+            "source_finding_ids": list(self.source_finding_ids),
+            "repair_objective": self.repair_objective,
+            "allowed_scope": list(self.allowed_scope),
+            "forbidden_expansion": list(self.forbidden_expansion),
+            "success_criteria": list(self.success_criteria),
+            "validation_expectation": list(self.validation_expectation),
+            "repair_round": self.repair_round,
         }
+
+    @classmethod
+    def from_record(cls, value: object) -> "RepairSpecCandidate" | None:
+        if not isinstance(value, dict):
+            return None
+        title = value.get("title")
+        goal = value.get("goal")
+        in_scope = value.get("in_scope", [])
+        validation_focus = value.get("validation_focus", [])
+        triggering_findings = value.get("triggering_findings", [])
+        source_finding_ids = value.get("source_finding_ids", [])
+        repair_objective = value.get("repair_objective")
+        allowed_scope = value.get("allowed_scope", [])
+        forbidden_expansion = value.get("forbidden_expansion", [])
+        success_criteria = value.get("success_criteria", [])
+        validation_expectation = value.get("validation_expectation", [])
+        repair_round = value.get("repair_round", 0)
+        if not isinstance(title, str) or not isinstance(goal, str):
+            return None
+        for items in (
+            in_scope,
+            validation_focus,
+            source_finding_ids,
+            allowed_scope,
+            forbidden_expansion,
+            success_criteria,
+            validation_expectation,
+        ):
+            if not isinstance(items, list) or not all(isinstance(item, str) for item in items):
+                return None
+        if repair_objective is not None and not isinstance(repair_objective, str):
+            return None
+        if not isinstance(repair_round, int):
+            return None
+        parsed_findings: list[ReviewFinding] = []
+        for item in triggering_findings:
+            finding = ReviewFinding.from_record(item)
+            if finding is None:
+                return None
+            parsed_findings.append(finding)
+        return cls(
+            title=title,
+            goal=goal,
+            in_scope=tuple(in_scope),
+            validation_focus=tuple(validation_focus),
+            triggering_findings=tuple(parsed_findings),
+            source_finding_ids=tuple(source_finding_ids),
+            repair_objective=repair_objective,
+            allowed_scope=tuple(allowed_scope),
+            forbidden_expansion=tuple(forbidden_expansion),
+            success_criteria=tuple(success_criteria),
+            validation_expectation=tuple(validation_expectation),
+            repair_round=repair_round,
+        )
 
 
 class ExecutionStatus(str, Enum):
@@ -227,20 +408,32 @@ def derive_repair_spec_candidate(
     findings: tuple[ReviewFinding, ...],
     uncovered_items: tuple[str, ...],
     validations_claimed: tuple[str, ...],
+    repair_round: int = 0,
 ) -> RepairSpecCandidate | None:
     blocking_findings = tuple(
-        finding for finding in findings if finding.severity is ReviewFindingSeverity.BLOCKING
+        finding for finding in findings if finding.is_blocking and finding.status is ReviewFindingStatus.OPEN
     )
     if not blocking_findings and not uncovered_items:
         return None
 
     scope_hints = list(uncovered_items)
     for finding in blocking_findings:
-        scope_hints.append(finding.message)
+        scope_hints.append(finding.summary)
 
     validation_focus = list(validations_claimed)
     if not validation_focus:
         validation_focus.append("Re-run the executor-reported validation path after repair.")
+
+    allowed_scope = tuple(scope_hints)
+    source_finding_ids = tuple(finding.normalized_finding_id for finding in blocking_findings)
+    success_criteria = tuple(
+        list(source_finding_ids)
+        + ["Validation evidence is refreshed after repair.", "Closeout no longer reports blocking findings."]
+    )
+    forbidden_expansion = (
+        "Do not expand the repair into new planning or adjacent roadmap work.",
+        "Do not widen file scope beyond the cited findings unless validation requires it.",
+    )
 
     return RepairSpecCandidate(
         title=f"Repair {spec_title}",
@@ -248,6 +441,68 @@ def derive_repair_spec_candidate(
         in_scope=tuple(scope_hints),
         validation_focus=tuple(validation_focus),
         triggering_findings=blocking_findings,
+        source_finding_ids=source_finding_ids,
+        repair_objective="Implement the smallest repair that closes the cited findings without expanding task scope.",
+        allowed_scope=allowed_scope,
+        forbidden_expansion=forbidden_expansion,
+        success_criteria=success_criteria,
+        validation_expectation=tuple(validation_focus),
+        repair_round=repair_round,
+    )
+
+
+def normalize_review_finding(
+    finding: ReviewFinding,
+    *,
+    default_source: str | None = None,
+    category: str | None = None,
+    scope: str | None = None,
+    affected_files: tuple[str, ...] = (),
+    affected_artifacts: tuple[str, ...] = (),
+    evidence: tuple[str, ...] = (),
+    suggested_fix_kind: str | None = None,
+) -> ReviewFinding:
+    return ReviewFinding(
+        code=finding.code,
+        message=finding.message,
+        severity=finding.severity,
+        field=finding.field,
+        source=finding.source or default_source,
+        category=category or finding.category,
+        scope=scope or finding.scope,
+        affected_files=finding.affected_files or affected_files,
+        affected_artifacts=finding.affected_artifacts or affected_artifacts,
+        evidence=finding.evidence or evidence,
+        blocking=finding.blocking,
+        status=finding.status,
+        suggested_fix_kind=suggested_fix_kind or finding.suggested_fix_kind,
+        finding_id=finding.finding_id or finding.code,
+    )
+
+
+def normalize_review_findings(
+    findings: tuple[ReviewFinding, ...],
+    *,
+    default_source: str | None = None,
+    category: str | None = None,
+    scope: str | None = None,
+    affected_files: tuple[str, ...] = (),
+    affected_artifacts: tuple[str, ...] = (),
+    evidence: tuple[str, ...] = (),
+    suggested_fix_kind: str | None = None,
+) -> tuple[ReviewFinding, ...]:
+    return tuple(
+        normalize_review_finding(
+            finding,
+            default_source=default_source,
+            category=category,
+            scope=scope,
+            affected_files=affected_files,
+            affected_artifacts=affected_artifacts,
+            evidence=evidence,
+            suggested_fix_kind=suggested_fix_kind,
+        )
+        for finding in findings
     )
 
 

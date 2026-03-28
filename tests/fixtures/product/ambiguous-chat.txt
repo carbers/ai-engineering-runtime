@@ -1,0 +1,3 @@
+User: We should finally use this runtime every day instead of babysitting it.
+Assistant: What is blocking that?
+User: The CLI still hides too much state, but the target is obvious: make inspect and next step readable, then stop before expanding scope.

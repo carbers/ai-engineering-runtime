@@ -1,0 +1,12 @@
+Request Summary: Tight repo repair slice
+Workflow Hint: repo-coding-task
+
+lane: repo-repair
+- goal: close one review finding and stop
+- current phase: review-ready
+- current assets: execution result / review summary
+- missing: repaired patch / validation rerun
+
+constraint: only touch src/ai_engineering_runtime/product_runtime.py
+forbidden scope: no new executor adapters
+review expectation: keep the repair inside the cited files and rerun validation

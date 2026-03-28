@@ -1,0 +1,16 @@
+Request Summary: JX3 AI NPC 4B MVP orchestration
+Workflow Hint: repo-coding-task
+
+main lane: mvp-lore-4b
+- goal: 基于现有设定文档与 resource 中已有材料，先跑通 JX3 AI NPC 4B MVP 全流程
+- current phase: M2-prepared
+- current assets: project scope / phase spec / schema freeze / eval freeze / seed train / teacher prompts / eval framework
+- missing: real baseline run / teacher expansion result / sft run result
+
+secondary lane: productlib-data-pipeline
+- status: parked
+- goal: productlib data pipeline expansion after MVP baseline
+- unblock condition: 主线 A 完成 MVP 基线并确认继续扩数
+- deferred scope: 当前不参与默认推进
+
+requires approval: yes

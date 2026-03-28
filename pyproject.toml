@@ -11,6 +11,7 @@ requires-python = ">=3.11"
 dependencies = []
 
 [project.scripts]
+ae = "ai_engineering_runtime.cli:main"
 ae-runtime = "ai_engineering_runtime.cli:main"
 
 [tool.setuptools]

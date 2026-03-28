@@ -1081,13 +1081,17 @@ def _parse_capability_profile(value: dict[str, Any]) -> ExecutorCapabilityProfil
         "can_return_patch",
         "can_return_commit",
         "can_run_tests",
+        "can_review",
+        "can_generate_docs",
+        "can_score_or_judge",
         "can_do_review_only",
         "supports_noninteractive",
+        "supports_retry",
         "supports_resume",
     )
     payload: dict[str, bool] = {}
     for key in keys:
-        item = value.get(key)
+        item = value.get(key, False)
         if not isinstance(item, bool):
             return None
         payload[key] = item
@@ -1105,47 +1109,19 @@ def _parse_execution_artifact_ref(value: object) -> ExecutionArtifactRef | objec
 
 
 def _parse_review_finding(value: object) -> ReviewFinding | object:
-    if not isinstance(value, dict):
+    parsed = ReviewFinding.from_record(value)
+    if parsed is None:
         return _INVALID
-    code = _coerce_str(value.get("code"))
-    message = _coerce_str(value.get("message"))
-    severity = _parse_enum(value.get("severity"), ReviewFindingSeverity)
-    field_name = value.get("field")
-    source = value.get("source")
-    if code is None or message is None or severity is None:
-        return _INVALID
-    if field_name is not None and not isinstance(field_name, str):
-        return _INVALID
-    if source is not None and not isinstance(source, str):
-        return _INVALID
-    return ReviewFinding(code=code, message=message, severity=severity, field=field_name, source=source)
+    return parsed
 
 
 def _parse_repair_spec_candidate(value: object) -> RepairSpecCandidate | None | object:
     if value is None:
         return None
-    if not isinstance(value, dict):
+    parsed = RepairSpecCandidate.from_record(value)
+    if parsed is None:
         return _INVALID
-    title = _coerce_str(value.get("title"))
-    goal = _coerce_str(value.get("goal"))
-    in_scope = value.get("in_scope", [])
-    validation_focus = value.get("validation_focus", [])
-    triggering_findings = value.get("triggering_findings", [])
-    if title is None or goal is None or not _is_list_of_strings(in_scope) or not _is_list_of_strings(validation_focus):
-        return _INVALID
-    parsed_findings: list[ReviewFinding] = []
-    for item in triggering_findings:
-        parsed = _parse_review_finding(item)
-        if parsed is _INVALID:
-            return _INVALID
-        parsed_findings.append(parsed)
-    return RepairSpecCandidate(
-        title=title,
-        goal=goal,
-        in_scope=tuple(in_scope),
-        validation_focus=tuple(validation_focus),
-        triggering_findings=tuple(parsed_findings),
-    )
+    return parsed
 
 
 def _parse_reason_list(value: object, *, field: str) -> tuple[RuntimeReason, ...] | None:

@@ -76,6 +76,11 @@ class FileSystemAdapter:
         package_dir.mkdir(parents=True, exist_ok=True)
         return package_dir / f"{run_id}.json"
 
+    def build_product_run_path(self, run_id: str) -> Path:
+        run_dir = self.repo_root / ".runtime" / "product-runs"
+        run_dir.mkdir(parents=True, exist_ok=True)
+        return run_dir / f"{run_id}.json"
+
     def write_json(self, path: Path, payload: dict[str, object]) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
@@ -180,8 +185,12 @@ def extract_executor_requirements(task_spec: TaskSpecArtifact) -> ExecutorRequir
         can_return_patch=_as_requirement(requirements_block.get("can_return_patch")),
         can_return_commit=_as_requirement(requirements_block.get("can_return_commit")),
         can_run_tests=_as_requirement(requirements_block.get("can_run_tests")),
+        can_review=_as_requirement(requirements_block.get("can_review")),
+        can_generate_docs=_as_requirement(requirements_block.get("can_generate_docs")),
+        can_score_or_judge=_as_requirement(requirements_block.get("can_score_or_judge")),
         can_do_review_only=_as_requirement(requirements_block.get("can_do_review_only")),
         supports_noninteractive=_as_requirement(requirements_block.get("supports_noninteractive")),
+        supports_retry=_as_requirement(requirements_block.get("supports_retry")),
         supports_resume=_as_requirement(requirements_block.get("supports_resume")),
     )
 
@@ -233,6 +242,7 @@ class ShellExecutorAdapter:
         capabilities=ExecutorCapabilityProfile(
             can_run_shell=True,
             supports_noninteractive=True,
+            supports_retry=True,
         ),
     )
     supported_modes = (DispatchMode.PREVIEW, DispatchMode.ECHO)
@@ -526,6 +536,11 @@ class MockCodexBackend:
                 message="Executor output should still be reviewed for residual repository hygiene and closeout gaps.",
                 severity=ReviewFindingSeverity.WARNING,
                 source="codex-mock",
+                category="closeout",
+                scope="execution-result",
+                evidence=("Mock Codex backend reported a residual review item.",),
+                suggested_fix_kind="review",
+                finding_id="codex-mock/manual-closeout-review",
             ),
         )
         run_label = prepared.payload_summary.title.lower().replace(" ", "-")
@@ -577,8 +592,12 @@ class CodexExecutorAdapter:
             can_open_repo_context=True,
             can_return_patch=True,
             can_run_tests=True,
+            can_review=True,
+            can_generate_docs=True,
+            can_score_or_judge=True,
             can_do_review_only=True,
             supports_noninteractive=True,
+            supports_retry=True,
         ),
     )
     supported_modes = (DispatchMode.PREVIEW, DispatchMode.SUBMIT)
@@ -690,6 +709,11 @@ class CodexExecutorAdapter:
                     code="missing-codex-result",
                     message="The Codex adapter could not collect a backend result for the submitted run.",
                     severity=ReviewFindingSeverity.BLOCKING,
+                    category="executor",
+                    scope="dispatch",
+                    evidence=("collect() returned no backend payload for the submitted Codex run.",),
+                    suggested_fix_kind="retry_dispatch",
+                    finding_id="codex/missing-result",
                 ),
             )
             repair_spec = derive_repair_spec_candidate(
@@ -834,29 +858,7 @@ def _load_mock_codex_payload(handle: ExecutorRunHandle) -> dict[str, object] | N
 
 
 def _parse_review_finding_record(value: object) -> ReviewFinding | None:
-    if not isinstance(value, dict):
-        return None
-    code = value.get("code")
-    message = value.get("message")
-    severity = value.get("severity")
-    field_name = value.get("field")
-    source = value.get("source")
-    if not isinstance(code, str) or not isinstance(message, str) or not isinstance(severity, str):
-        return None
-    if field_name is not None and not isinstance(field_name, str):
-        return None
-    if source is not None and not isinstance(source, str):
-        return None
-    try:
-        return ReviewFinding(
-            code=code,
-            message=message,
-            severity=ReviewFindingSeverity(severity),
-            field=field_name,
-            source=source,
-        )
-    except ValueError:
-        return None
+    return ReviewFinding.from_record(value)
 
 
 def _parse_execution_artifact_ref_record(value: object) -> ExecutionArtifactRef | None:

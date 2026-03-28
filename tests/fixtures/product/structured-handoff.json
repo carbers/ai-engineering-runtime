@@ -1,0 +1,85 @@
+{
+  "schema_version": 1,
+  "source_kind": "handoff",
+  "intake_profile": "structured_handoff",
+  "source_path": null,
+  "request_summary": "Structured runtime handoff",
+  "normalized_objective": "Use the structured handoff path to preview one run before dispatch.",
+  "workflow_id": "repo-coding-task",
+  "workflow_hint": "repo-coding-task",
+  "lane_hint": "runtime-structured",
+  "phase_hint": "dispatch-ready",
+  "phase_metadata": {
+    "initial_phase": "dispatch-ready",
+    "lane_count": "1",
+    "repo_root": "ai-engineering-runtime",
+    "intake_profile": "structured_handoff"
+  },
+  "required_artifacts": [
+    {
+      "name": "execution package",
+      "category": "planning",
+      "presence": "present",
+      "detail": null
+    },
+    {
+      "name": "execution result",
+      "category": "execution",
+      "presence": "missing",
+      "detail": null
+    }
+  ],
+  "initial_execution_intent": {
+    "summary": "Preview the next legal action before dispatch.",
+    "executable_package_present": true,
+    "requires_human_approval": true,
+    "blocked_on_external_resource": false,
+    "dispatch_mode": "manual",
+    "preferred_node": "executor-dispatch"
+  },
+  "review_expectations": [
+    "confirm the preview keeps the run on hold until an explicit dispatch decision"
+  ],
+  "constraints": [
+    "keep the change narrow"
+  ],
+  "defaults_applied": [
+    "dispatch mode defaulted to manual"
+  ],
+  "warnings": [],
+  "lanes": [
+    {
+      "lane_id": "runtime-structured",
+      "title": "runtime-structured",
+      "status": "active",
+      "priority": 1,
+      "goal": "preview one structured handoff path",
+      "parent_phase": "dispatch-ready",
+      "unblock_conditions": [],
+      "next_legal_actions": [],
+      "deferred_scope": [],
+      "not_doing_now": [],
+      "current_artifacts": [
+        {
+          "name": "execution package",
+          "category": "planning",
+          "presence": "present",
+          "detail": null
+        }
+      ],
+      "missing_artifacts": [
+        {
+          "name": "execution result",
+          "category": "execution",
+          "presence": "missing",
+          "detail": null
+        }
+      ]
+    }
+  ],
+  "repo_context": {
+    "repo_root": "d:/github/ai-engineering-runtime",
+    "repo_name": "ai-engineering-runtime"
+  },
+  "raw_request_excerpt": "Structured runtime handoff"
+}

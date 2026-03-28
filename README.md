@@ -21,6 +21,15 @@ The current implementation is intentionally smaller than that full direction: on
 
 The current implementation now also includes a vendor-neutral executor adapter contract, capability gating, a minimal Codex adapter v1 with a mockable backend seam, and normalized execution results that preserve the boundary of `runtime = control plane` and `executor = worker plane`.
 
+The runtime now also exposes a product-oriented intake layer on top of those node-level contracts:
+
+- consume `chat`, `prompt`, or normalized `handoff` input directly
+- compile natural-language input into a validated internal handoff schema
+- select a workflow and evaluate structured phase gates
+- keep lane state, artifact class, executor routing, and next-step decisions explicit
+- hold instead of auto-continuing when approval, review, or blocked state should stop progress
+- run a minimal review-repair-closeout loop with retry and fallback policy
+
 ## What stays the same
 
 The copied SOP starter is still the canonical development model for this repo:
@@ -74,6 +83,42 @@ The copied SOP layer in this repository now also includes:
 
 ## Implemented commands
 
+The product-oriented control-plane entrypoints are:
+
+```text
+ae run --from-chat tests/fixtures/product/jx3-chat.txt
+ae run --from-prompt tests/fixtures/product/review-loop-prompt.txt
+ae run --from-handoff .runtime/compiled/review-loop.json
+ae run --from-chat tests/fixtures/product/jx3-chat.txt --preview-handoff
+ae run --from-prompt tests/fixtures/product/review-loop-prompt.txt --dry-run
+ae compile-handoff --from-prompt tests/fixtures/product/review-loop-prompt.txt --out .runtime/compiled/review-loop.json
+ae compile-handoff --from-prompt tests/fixtures/product/review-loop-prompt.txt --preview
+ae validate-handoff --handoff .runtime/compiled/review-loop.json
+ae inspect <run-id>
+ae resume <run-id>
+ae retry <run-id> --node repair-dispatch
+ae close <run-id>
+```
+
+Those commands persist product-run state under `.runtime/product-runs/` and report:
+
+- active, parked, and blocked lanes
+- phase gate outcomes and why auto-advance is or is not allowed
+- compile preview defaults, warnings, and unresolved ambiguity before dispatch
+- artifact gaps grouped by planning, execution, and review/closeout needs
+- executor dispatch candidates, node-level default routing, and capability-matched routes
+- normalized review findings with repair-loop status, repair rounds, and closeout readiness
+- last node result, last executor result, and a compact run timeline across intake, dispatch, review, repair, validation, and closeout
+
+The current productized runtime now treats next-step control as a gated action rather than a default continuation:
+
+- `phase complete` does not auto-advance into more planning or closeout work
+- `inspect` shows the default action, all legal actions, and why auto-advance is disabled
+- review findings are normalized into one repair surface and can drive `repair-dispatch -> validation -> closeout`
+- repair rounds are capped by policy and escalate to review when the loop should stop
+
+The lower-level node commands remain available:
+
 The current executable slice is:
 
 ```text
@@ -96,6 +141,7 @@ ae-runtime followup-package --latest
 ```
 
 The `ae-runtime` command path assumes the project has been installed into the current Python environment.
+The `ae` command is now also exported as a product-oriented alias for the same CLI entrypoint.
 Before installation, use the module form from the repository root:
 
 ```powershell
@@ -152,6 +198,7 @@ If you also want to validate the installed console script path in the same envir
 
 ```powershell
 python -m pip install -e .
+ae run --from-chat tests/fixtures/product/jx3-chat.txt
 ae-runtime plan-readiness-check --plan ai/doc/runtime/roadmap.md
 ```
 

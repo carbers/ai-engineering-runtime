@@ -1,0 +1,13 @@
+Request Summary: Productized control-plane review loop fixture
+Workflow Hint: repo-coding-task
+
+lane: runtime-product-upgrade
+- goal: execute one narrow coding task and close review findings through the runtime-native repair loop
+- current phase: execution-ready
+- current assets: phase spec / execution package / validation contract
+- missing: execution result / review closeout summary
+
+auto dispatch: yes
+requires approval: no
+review expectation: update the closeout-facing documentation before closeout
+review expectation: rerun validation after repairing the review finding

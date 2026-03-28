@@ -1,0 +1,16 @@
+Request Summary: Runtime dogfood hardening preview
+Workflow Hint: repo-coding-task
+
+Please harden the runtime so daily use is clearer from the CLI.
+We need stronger inspect output, clearer missing-artifact summaries, and a repair-aware closeout path.
+
+lane: runtime-dogfood
+- goal: harden the local runtime UX for day-to-day use
+- current phase: execution-ready
+- current assets: phase spec / task spec / executor routing / cli entrypoint
+- missing: inspect refresh result / repair closeout summary
+
+constraint: keep changes incremental
+constraint: do not widen into a dashboard
+review expectation: confirm the inspect output is readable without opening JSON
+review expectation: rerun the minimal repair loop after the fix
