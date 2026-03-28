@@ -13,20 +13,20 @@
   "plan_path": null,
   "readiness": null,
   "rendered_output": null,
-  "spec_path": "docs/specs/20260322-005-validation-collect-foundation.md",
+  "spec_path": "ai/doc/specs/20260322-005-validation-collect-foundation.md",
   "success": false,
   "to_state": "blocked",
   "validation": {
     "evidence": [
       {
         "kind": "command",
-        "source": "docs/specs/20260322-005-validation-collect-foundation.md",
+        "source": "ai/doc/specs/20260322-005-validation-collect-foundation.md",
         "status": "passed",
         "summary": "Command evidence reported."
       },
       {
         "kind": "black_box",
-        "source": "docs/specs/20260322-005-validation-collect-foundation.md",
+        "source": "ai/doc/specs/20260322-005-validation-collect-foundation.md",
         "status": "passed",
         "summary": "Black-box validation evidence reported."
       }

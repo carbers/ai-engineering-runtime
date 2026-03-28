@@ -99,7 +99,7 @@ READY_SPEC = """
 ## Metadata
 
 ### Source Plan / Request
-`docs/runtime/roadmap.md`
+`ai/doc/runtime/roadmap.md`
 
 ### Status
 `in-progress`
@@ -173,11 +173,11 @@ class WorkflowIntegrationTests(unittest.TestCase):
     def test_ready_plan_can_flow_through_spec_readiness_and_dispatch_preview(self) -> None:
         with repo_temp_dir() as temp_dir:
             root = Path(temp_dir)
-            _write_repo_file(root, "docs/runtime/roadmap.md", READY_ROADMAP)
+            _write_repo_file(root, "ai/doc/runtime/roadmap.md", READY_ROADMAP)
 
             exit_code, stdout, stderr = _run_cli(
                 root,
-                ["plan-readiness-check", "--plan", "docs/runtime/roadmap.md"],
+                ["plan-readiness-check", "--plan", "ai/doc/runtime/roadmap.md"],
             )
             self.assertEqual(exit_code, 0)
             self.assertEqual(stderr, "")
@@ -185,13 +185,13 @@ class WorkflowIntegrationTests(unittest.TestCase):
 
             exit_code, stdout, stderr = _run_cli(
                 root,
-                ["plan-to-spec", "--plan", "docs/runtime/roadmap.md"],
+                ["plan-to-spec", "--plan", "ai/doc/runtime/roadmap.md"],
             )
             self.assertEqual(exit_code, 0)
             self.assertEqual(stderr, "")
             self.assertIn("plan-to-spec completed", stdout)
 
-            spec_paths = sorted((root / "docs" / "specs").glob("*.md"))
+            spec_paths = sorted((root / "ai" / "doc" / "specs").glob("*.md"))
             self.assertEqual(len(spec_paths), 1)
             spec_path = spec_paths[0]
             relative_spec = spec_path.relative_to(root).as_posix()
@@ -220,14 +220,14 @@ class WorkflowIntegrationTests(unittest.TestCase):
     def test_validation_failure_flow_produces_blocking_rollup_and_fix_followup(self) -> None:
         with repo_temp_dir() as temp_dir:
             root = Path(temp_dir)
-            _write_repo_file(root, "docs/specs/20260323-099-validation-failure-sample.md", READY_SPEC)
+            _write_repo_file(root, "ai/doc/specs/20260323-099-validation-failure-sample.md", READY_SPEC)
 
             exit_code, stdout, stderr = _run_cli(
                 root,
                 [
                     "validation-collect",
                     "--spec",
-                    "docs/specs/20260323-099-validation-failure-sample.md",
+                    "ai/doc/specs/20260323-099-validation-failure-sample.md",
                     "--command-status",
                     "failed",
                     "--black-box-status",

@@ -58,7 +58,7 @@ class HistorySelectionTests(unittest.TestCase):
             selection = select_correlated_history(
                 root,
                 artifact_kind=ArtifactTargetKind.SPEC,
-                artifact_path=Path("docs/specs/20260322-005-validation-collect-foundation.md"),
+                artifact_path=Path("ai/doc/specs/20260322-005-validation-collect-foundation.md"),
                 node_name="validation-collect",
                 limit=2,
             )
@@ -82,7 +82,7 @@ class HistorySelectionTests(unittest.TestCase):
             selection = select_correlated_history(
                 root,
                 artifact_kind=ArtifactTargetKind.SPEC,
-                artifact_path=Path("docs/specs/20260322-005-validation-collect-foundation.md"),
+                artifact_path=Path("ai/doc/specs/20260322-005-validation-collect-foundation.md"),
                 signal_kind=ReplaySignalKind.FOLLOWUP,
             )
 
@@ -99,7 +99,7 @@ class HistorySelectionTests(unittest.TestCase):
                 RunHistorySelectNode(
                     RunHistorySelectRequest(
                         artifact_kind=ArtifactTargetKind.SPEC,
-                        artifact_path=Path("docs/specs/20260322-005-validation-collect-foundation.md"),
+                        artifact_path=Path("ai/doc/specs/20260322-005-validation-collect-foundation.md"),
                         node_name="validation-collect",
                         limit=1,
                     )
@@ -123,7 +123,7 @@ class HistorySelectionTests(unittest.TestCase):
                     "from_state": "spec-ready",
                     "to_state": "executing",
                     "plan_path": None,
-                    "spec_path": "docs/specs/20260327-001-executor-adapter-codex-v1.md",
+                    "spec_path": "ai/doc/specs/20260327-001-executor-adapter-codex-v1.md",
                     "output_path": None,
                     "log_path": ".runtime/runs/20260327T120000000001-executor-dispatch.json",
                     "rendered_output": None,
@@ -162,7 +162,7 @@ class HistorySelectionTests(unittest.TestCase):
                     "from_state": "spec-ready",
                     "to_state": "executing",
                     "plan_path": None,
-                    "spec_path": "docs/specs/20260327-001-executor-adapter-codex-v1.md",
+                    "spec_path": "ai/doc/specs/20260327-001-executor-adapter-codex-v1.md",
                     "output_path": None,
                     "log_path": ".runtime/runs/20260327T115900000000-executor-dispatch.json",
                     "rendered_output": None,
@@ -204,7 +204,7 @@ class HistorySelectionTests(unittest.TestCase):
                                 "supports_resume": False,
                             },
                         },
-                        "spec_identity": "docs/specs/20260327-001-executor-adapter-codex-v1.md",
+                        "spec_identity": "ai/doc/specs/20260327-001-executor-adapter-codex-v1.md",
                         "dispatch_summary": {
                             "title": "Dispatch Sample",
                             "goal": "Hand off a narrow task safely.",
@@ -233,7 +233,7 @@ class HistorySelectionTests(unittest.TestCase):
             selection = select_correlated_history(
                 root,
                 artifact_kind=ArtifactTargetKind.SPEC,
-                artifact_path=Path("docs/specs/20260327-001-executor-adapter-codex-v1.md"),
+                artifact_path=Path("ai/doc/specs/20260327-001-executor-adapter-codex-v1.md"),
                 node_name="executor-dispatch",
                 limit=2,
             )
@@ -254,7 +254,7 @@ class HistorySelectionTests(unittest.TestCase):
                     "from_state": "spec-ready",
                     "to_state": "executing",
                     "plan_path": None,
-                    "spec_path": "docs/specs/20260327-001-executor-adapter-codex-v1.md",
+                    "spec_path": "ai/doc/specs/20260327-001-executor-adapter-codex-v1.md",
                     "output_path": None,
                     "log_path": ".runtime/runs/20260327T120000000002-executor-dispatch.json",
                     "rendered_output": None,
@@ -284,7 +284,7 @@ class HistorySelectionTests(unittest.TestCase):
                                 "supports_resume": False,
                             },
                         },
-                        "spec_identity": "docs/specs/20260327-001-executor-adapter-codex-v1.md",
+                        "spec_identity": "ai/doc/specs/20260327-001-executor-adapter-codex-v1.md",
                         "dispatch_summary": {
                             "title": "Dispatch Sample",
                             "goal": "Hand off a narrow task safely.",
@@ -318,7 +318,7 @@ class HistorySelectionTests(unittest.TestCase):
                     "from_state": "spec-ready",
                     "to_state": "executing",
                     "plan_path": None,
-                    "spec_path": "docs/specs/20260327-001-executor-adapter-codex-v1.md",
+                    "spec_path": "ai/doc/specs/20260327-001-executor-adapter-codex-v1.md",
                     "output_path": None,
                     "log_path": ".runtime/runs/20260327T115900000001-executor-dispatch.json",
                     "rendered_output": None,
@@ -360,7 +360,7 @@ class HistorySelectionTests(unittest.TestCase):
                                 "supports_resume": False,
                             },
                         },
-                        "spec_identity": "docs/specs/20260327-001-executor-adapter-codex-v1.md",
+                        "spec_identity": "ai/doc/specs/20260327-001-executor-adapter-codex-v1.md",
                         "dispatch_summary": {
                             "title": "Dispatch Sample",
                             "goal": "Hand off a narrow task safely.",
@@ -389,7 +389,7 @@ class HistorySelectionTests(unittest.TestCase):
             selection = select_correlated_history(
                 root,
                 artifact_kind=ArtifactTargetKind.SPEC,
-                artifact_path=Path("docs/specs/20260327-001-executor-adapter-codex-v1.md"),
+                artifact_path=Path("ai/doc/specs/20260327-001-executor-adapter-codex-v1.md"),
                 node_name="executor-dispatch",
                 limit=2,
             )

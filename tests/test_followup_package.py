@@ -93,9 +93,9 @@ class FollowupPackageTests(unittest.TestCase):
             skill_package, _ = resolve_followup_package_query(adapter, run_id=skill_result.log_path.stem)
 
             self.assertEqual(writeback_package.action, FollowupAction.WRITE_BACK_STABLE_CONTEXT)
-            self.assertIn("docs/facts", writeback_package.suggested_next_step)
+            self.assertIn("ai/doc/facts", writeback_package.suggested_next_step)
             self.assertEqual(skill_package.action, FollowupAction.PROMOTE_SKILL_CANDIDATE)
-            self.assertIn("skills/", skill_package.suggested_next_step)
+            self.assertIn("ai/skill/", skill_package.suggested_next_step)
 
     def test_builds_non_actionable_no_followup_package(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

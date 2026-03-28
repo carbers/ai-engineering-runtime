@@ -64,7 +64,7 @@ class ValidationRollupTests(unittest.TestCase):
                 "from_state": "validating",
                 "to_state": "writeback-review",
                 "plan_path": None,
-                "spec_path": "docs/specs/20260322-999-advisory.md",
+                "spec_path": "ai/doc/specs/20260322-999-advisory.md",
                 "output_path": None,
                 "log_path": f".runtime/runs/{run_id}.json",
                 "issues": [],

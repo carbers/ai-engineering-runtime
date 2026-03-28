@@ -64,7 +64,7 @@ Runtime Plan To Spec Foundation
 - executor dispatch
 
 ### Affected Area
-- `docs/runtime/*`
+- `ai/doc/runtime/*`
 - `src/ai_engineering_runtime/*`
 
 ### Task Checklist
@@ -106,16 +106,16 @@ class PlanToSpecNodeTests(unittest.TestCase):
     def test_execute_writes_spec_and_run_log(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
-            _write_repo_file(root, "docs/runtime/roadmap.md", VALID_ROADMAP)
-            _write_repo_file(root, "docs/facts/project-scope.md", "# Scope")
-            _write_repo_file(root, "skills/plan-to-spec.md", "# Skill")
+            _write_repo_file(root, "ai/doc/runtime/roadmap.md", VALID_ROADMAP)
+            _write_repo_file(root, "ai/doc/facts/project-scope.md", "# Scope")
+            _write_repo_file(root, "ai/skill/plan-to-spec.md", "# Skill")
 
             adapter = FileSystemAdapter(root)
             engine = RuntimeEngine(adapter)
             result = engine.run(
                 PlanToSpecNode(
                     PlanToSpecRequest(
-                        plan_path=Path("docs/runtime/roadmap.md"),
+                        plan_path=Path("ai/doc/runtime/roadmap.md"),
                         created_on=date(2026, 3, 22),
                     )
                 )
@@ -140,14 +140,14 @@ class PlanToSpecNodeTests(unittest.TestCase):
     def test_dry_run_emits_spec_without_writing_output(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
-            _write_repo_file(root, "docs/runtime/roadmap.md", VALID_ROADMAP)
+            _write_repo_file(root, "ai/doc/runtime/roadmap.md", VALID_ROADMAP)
 
             adapter = FileSystemAdapter(root)
             engine = RuntimeEngine(adapter)
             result = engine.run(
                 PlanToSpecNode(
                     PlanToSpecRequest(
-                        plan_path=Path("docs/runtime/roadmap.md"),
+                        plan_path=Path("ai/doc/runtime/roadmap.md"),
                         dry_run=True,
                         created_on=date(2026, 3, 22),
                     )
@@ -167,12 +167,12 @@ class PlanToSpecNodeTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             invalid_roadmap = VALID_ROADMAP.replace("### Done When\nThe CLI turns this roadmap into a draft spec.\n\n", "")
-            _write_repo_file(root, "docs/runtime/roadmap.md", invalid_roadmap)
+            _write_repo_file(root, "ai/doc/runtime/roadmap.md", invalid_roadmap)
 
             adapter = FileSystemAdapter(root)
             result = PlanToSpecNode(
                 PlanToSpecRequest(
-                    plan_path=Path("docs/runtime/roadmap.md"),
+                    plan_path=Path("ai/doc/runtime/roadmap.md"),
                     created_on=date(2026, 3, 22),
                 )
             ).execute(adapter)
@@ -192,12 +192,12 @@ class PlanToSpecNodeTests(unittest.TestCase):
                 "### In Scope\n- align runtime docs\n- implement the plan-to-spec node\n",
                 "### In Scope\nalign runtime docs without bullet markers\n",
             )
-            _write_repo_file(root, "docs/runtime/roadmap.md", invalid_roadmap)
+            _write_repo_file(root, "ai/doc/runtime/roadmap.md", invalid_roadmap)
 
             adapter = FileSystemAdapter(root)
             result = PlanToSpecNode(
                 PlanToSpecRequest(
-                    plan_path=Path("docs/runtime/roadmap.md"),
+                    plan_path=Path("ai/doc/runtime/roadmap.md"),
                     created_on=date(2026, 3, 22),
                 )
             ).execute(adapter)

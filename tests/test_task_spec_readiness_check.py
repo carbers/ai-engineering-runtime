@@ -38,7 +38,7 @@ READY_TASK_SPEC = """
 ## Metadata
 
 ### Source Plan / Request
-`docs/runtime/roadmap.md`
+`ai/doc/runtime/roadmap.md`
 
 ### Status
 `draft`
@@ -110,14 +110,14 @@ class TaskSpecReadinessCheckNodeTests(unittest.TestCase):
     def test_execute_reports_ready_for_implementable_task_spec(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
-            _write_repo_file(root, "docs/specs/20260322-999-sample.md", READY_TASK_SPEC)
+            _write_repo_file(root, "ai/doc/specs/20260322-999-sample.md", READY_TASK_SPEC)
 
             adapter = FileSystemAdapter(root)
             engine = RuntimeEngine(adapter)
             result = engine.run(
                 TaskSpecReadinessCheckNode(
                     TaskSpecReadinessCheckRequest(
-                        spec_path=Path("docs/specs/20260322-999-sample.md")
+                        spec_path=Path("ai/doc/specs/20260322-999-sample.md")
                     )
                 )
             )
@@ -132,17 +132,17 @@ class TaskSpecReadinessCheckNodeTests(unittest.TestCase):
 
             payload = json.loads(result.log_path.read_text(encoding="utf-8"))
             self.assertEqual(payload["readiness"]["status"], "ready")
-            self.assertEqual(payload["spec_path"], "docs/specs/20260322-999-sample.md")
+            self.assertEqual(payload["spec_path"], "ai/doc/specs/20260322-999-sample.md")
 
     def test_execute_reports_needs_clarification_for_placeholder_field(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
-            _write_repo_file(root, "docs/specs/20260322-999-sample.md", NEEDS_CLARIFICATION_TASK_SPEC)
+            _write_repo_file(root, "ai/doc/specs/20260322-999-sample.md", NEEDS_CLARIFICATION_TASK_SPEC)
 
             adapter = FileSystemAdapter(root)
             result = TaskSpecReadinessCheckNode(
                 TaskSpecReadinessCheckRequest(
-                    spec_path=Path("docs/specs/20260322-999-sample.md")
+                    spec_path=Path("ai/doc/specs/20260322-999-sample.md")
                 )
             ).execute(adapter)
 
@@ -156,12 +156,12 @@ class TaskSpecReadinessCheckNodeTests(unittest.TestCase):
     def test_execute_reports_blocked_for_non_executable_status(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
-            _write_repo_file(root, "docs/specs/20260322-999-sample.md", BLOCKED_TASK_SPEC)
+            _write_repo_file(root, "ai/doc/specs/20260322-999-sample.md", BLOCKED_TASK_SPEC)
 
             adapter = FileSystemAdapter(root)
             result = TaskSpecReadinessCheckNode(
                 TaskSpecReadinessCheckRequest(
-                    spec_path=Path("docs/specs/20260322-999-sample.md")
+                    spec_path=Path("ai/doc/specs/20260322-999-sample.md")
                 )
             ).execute(adapter)
 
@@ -179,7 +179,7 @@ class TaskSpecReadinessCheckNodeTests(unittest.TestCase):
             adapter = FileSystemAdapter(root)
             result = TaskSpecReadinessCheckNode(
                 TaskSpecReadinessCheckRequest(
-                    spec_path=Path("docs/specs/missing.md")
+                    spec_path=Path("ai/doc/specs/missing.md")
                 )
             ).execute(adapter)
 

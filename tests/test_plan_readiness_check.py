@@ -121,13 +121,13 @@ class PlanReadinessCheckNodeTests(unittest.TestCase):
     def test_execute_reports_ready_for_compilable_plan(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
-            _write_repo_file(root, "docs/runtime/roadmap.md", READY_ROADMAP)
+            _write_repo_file(root, "ai/doc/runtime/roadmap.md", READY_ROADMAP)
 
             adapter = FileSystemAdapter(root)
             engine = RuntimeEngine(adapter)
             result = engine.run(
                 PlanReadinessCheckNode(
-                    PlanReadinessCheckRequest(plan_path=Path("docs/runtime/roadmap.md"))
+                    PlanReadinessCheckRequest(plan_path=Path("ai/doc/runtime/roadmap.md"))
                 )
             )
 
@@ -145,11 +145,11 @@ class PlanReadinessCheckNodeTests(unittest.TestCase):
     def test_execute_reports_needs_clarification_for_placeholder_content(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
-            _write_repo_file(root, "docs/runtime/roadmap.md", NEEDS_CLARIFICATION_ROADMAP)
+            _write_repo_file(root, "ai/doc/runtime/roadmap.md", NEEDS_CLARIFICATION_ROADMAP)
 
             adapter = FileSystemAdapter(root)
             result = PlanReadinessCheckNode(
-                PlanReadinessCheckRequest(plan_path=Path("docs/runtime/roadmap.md"))
+                PlanReadinessCheckRequest(plan_path=Path("ai/doc/runtime/roadmap.md"))
             ).execute(adapter)
 
             self.assertFalse(result.success)
@@ -163,11 +163,11 @@ class PlanReadinessCheckNodeTests(unittest.TestCase):
     def test_execute_reports_blocked_for_missing_required_structure(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
-            _write_repo_file(root, "docs/runtime/roadmap.md", BLOCKED_ROADMAP)
+            _write_repo_file(root, "ai/doc/runtime/roadmap.md", BLOCKED_ROADMAP)
 
             adapter = FileSystemAdapter(root)
             result = PlanReadinessCheckNode(
-                PlanReadinessCheckRequest(plan_path=Path("docs/runtime/roadmap.md"))
+                PlanReadinessCheckRequest(plan_path=Path("ai/doc/runtime/roadmap.md"))
             ).execute(adapter)
 
             self.assertFalse(result.success)
@@ -183,7 +183,7 @@ class PlanReadinessCheckNodeTests(unittest.TestCase):
 
             adapter = FileSystemAdapter(root)
             result = PlanReadinessCheckNode(
-                PlanReadinessCheckRequest(plan_path=Path("docs/runtime/missing.md"))
+                PlanReadinessCheckRequest(plan_path=Path("ai/doc/runtime/missing.md"))
             ).execute(adapter)
 
             self.assertFalse(result.success)
@@ -194,12 +194,12 @@ class PlanReadinessCheckNodeTests(unittest.TestCase):
     def test_plan_to_spec_stops_when_readiness_needs_clarification(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
-            _write_repo_file(root, "docs/runtime/roadmap.md", NEEDS_CLARIFICATION_ROADMAP)
+            _write_repo_file(root, "ai/doc/runtime/roadmap.md", NEEDS_CLARIFICATION_ROADMAP)
 
             adapter = FileSystemAdapter(root)
             result = PlanToSpecNode(
                 PlanToSpecRequest(
-                    plan_path=Path("docs/runtime/roadmap.md"),
+                    plan_path=Path("ai/doc/runtime/roadmap.md"),
                     dry_run=True,
                     created_on=date(2026, 3, 22),
                 )

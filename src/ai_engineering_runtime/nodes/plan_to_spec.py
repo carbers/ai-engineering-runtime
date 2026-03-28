@@ -46,7 +46,7 @@ class PlanToSpecNode:
                 adapter.resolve(self.request.output_path)
                 if self.request.output_path is not None
                 else next_task_spec_path(
-                    adapter.repo_root / "docs" / "specs",
+                    adapter.repo_root / "ai" / "doc" / "specs",
                     self.request.created_on,
                     draft.slug,
                 )

@@ -7,8 +7,8 @@
     "dry_run": true
   },
   "node": "plan-to-spec",
-  "output_path": "docs/specs/20260322-002-runtime-plan-to-spec-foundation.md",
-  "plan_path": "docs/runtime/roadmap.md",
+  "output_path": "ai/doc/specs/20260322-002-runtime-plan-to-spec-foundation.md",
+  "plan_path": "ai/doc/runtime/roadmap.md",
   "rendered_output": null,
   "success": true,
   "to_state": "spec-ready"

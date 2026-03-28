@@ -35,7 +35,7 @@ def _write_file(root: Path, relative_path: str, content: str) -> None:
 class ArtifactProtocolTests(unittest.TestCase):
     def test_plan_artifact_parses_nested_first_slice_contract(self) -> None:
         plan = PlanArtifact.from_markdown(
-            Path("docs/runtime/roadmap.md"),
+            Path("ai/doc/runtime/roadmap.md"),
             textwrap.dedent(
                 """
                 # Runtime Roadmap
@@ -110,10 +110,10 @@ class ArtifactProtocolTests(unittest.TestCase):
     def test_discover_artifacts_reads_canonical_locations(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
-            _write_file(root, "docs/runtime/roadmap.md", "# Runtime Roadmap")
-            _write_file(root, "docs/specs/20260322-001-sample.md", "# Sample Spec")
-            _write_file(root, "docs/facts/project-scope.md", "# Project Scope")
-            _write_file(root, "skills/plan-to-spec.md", "# Skill")
+            _write_file(root, "ai/doc/runtime/roadmap.md", "# Runtime Roadmap")
+            _write_file(root, "ai/doc/specs/20260322-001-sample.md", "# Sample Spec")
+            _write_file(root, "ai/doc/facts/project-scope.md", "# Project Scope")
+            _write_file(root, "ai/skill/plan-to-spec.md", "# Skill")
 
             refs = discover_artifacts(root)
             kinds = [(ref.kind, ref.path.name) for ref in refs]
@@ -125,7 +125,7 @@ class ArtifactProtocolTests(unittest.TestCase):
 
     def test_task_spec_artifact_parses_metadata_and_validation_sections(self) -> None:
         task_spec = TaskSpecArtifact.from_markdown(
-            Path("docs/specs/20260322-999-sample.md"),
+            Path("ai/doc/specs/20260322-999-sample.md"),
             textwrap.dedent(
                 """
                 # Sample Task Spec
@@ -133,7 +133,7 @@ class ArtifactProtocolTests(unittest.TestCase):
                 ## Metadata
 
                 ### Source Plan / Request
-                `docs/runtime/roadmap.md`
+                `ai/doc/runtime/roadmap.md`
 
                 ### Status
                 `draft`
@@ -182,7 +182,7 @@ class ArtifactProtocolTests(unittest.TestCase):
             ),
         )
 
-        self.assertEqual(task_spec.metadata["Source Plan / Request"], "`docs/runtime/roadmap.md`")
+        self.assertEqual(task_spec.metadata["Source Plan / Request"], "`ai/doc/runtime/roadmap.md`")
         self.assertEqual(task_spec.status, "draft")
         self.assertEqual(task_spec.validation["White-box Needed"], "Yes")
 

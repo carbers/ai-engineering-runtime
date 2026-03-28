@@ -49,7 +49,7 @@ READY_TASK_SPEC = """
 ## Metadata
 
 ### Source Plan / Request
-`docs/runtime/roadmap.md`
+`ai/doc/runtime/roadmap.md`
 
 ### Status
 `in-progress`
@@ -193,14 +193,14 @@ class ExecutorRunLifecycleNodeTests(unittest.TestCase):
     def test_poll_revisits_running_executor_run_and_advances_to_validating(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
-            _write_repo_file(root, "docs/specs/20260327-999-dispatch.md", READY_TASK_SPEC)
+            _write_repo_file(root, "ai/doc/specs/20260327-999-dispatch.md", READY_TASK_SPEC)
 
             lifecycle_adapter = LifecycleCodexAdapter()
             adapter = FileSystemAdapter(root)
             dispatch_result = RuntimeEngine(adapter).run(
                 ExecutorDispatchNode(
                     ExecutorDispatchRequest(
-                        spec_path=Path("docs/specs/20260327-999-dispatch.md"),
+                        spec_path=Path("ai/doc/specs/20260327-999-dispatch.md"),
                         target=ExecutorTarget.CODEX,
                         mode=DispatchMode.SUBMIT,
                     ),
@@ -229,13 +229,13 @@ class ExecutorRunLifecycleNodeTests(unittest.TestCase):
     def test_resume_rejects_executor_without_resume_capability(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
-            _write_repo_file(root, "docs/specs/20260327-999-dispatch.md", READY_TASK_SPEC)
+            _write_repo_file(root, "ai/doc/specs/20260327-999-dispatch.md", READY_TASK_SPEC)
 
             adapter = FileSystemAdapter(root)
             dispatch_result = RuntimeEngine(adapter).run(
                 ExecutorDispatchNode(
                     ExecutorDispatchRequest(
-                        spec_path=Path("docs/specs/20260327-999-dispatch.md"),
+                        spec_path=Path("ai/doc/specs/20260327-999-dispatch.md"),
                         target=ExecutorTarget.CODEX,
                         mode=DispatchMode.SUBMIT,
                     )
@@ -256,7 +256,7 @@ class ExecutorRunLifecycleNodeTests(unittest.TestCase):
     def test_resume_advances_when_backend_declares_resume_capability(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
-            _write_repo_file(root, "docs/specs/20260327-999-dispatch.md", READY_TASK_SPEC)
+            _write_repo_file(root, "ai/doc/specs/20260327-999-dispatch.md", READY_TASK_SPEC)
 
             backend = ResumeCapableLifecycleBackend()
             resume_capable_adapter = CodexExecutorAdapter(backend=backend)
@@ -264,7 +264,7 @@ class ExecutorRunLifecycleNodeTests(unittest.TestCase):
             dispatch_result = RuntimeEngine(adapter).run(
                 ExecutorDispatchNode(
                     ExecutorDispatchRequest(
-                        spec_path=Path("docs/specs/20260327-999-dispatch.md"),
+                        spec_path=Path("ai/doc/specs/20260327-999-dispatch.md"),
                         target=ExecutorTarget.CODEX,
                         mode=DispatchMode.SUBMIT,
                     ),
@@ -293,14 +293,14 @@ class ExecutorRunLifecycleNodeTests(unittest.TestCase):
     def test_poll_preserves_existing_execution_context_for_non_terminal_revisit(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
-            _write_repo_file(root, "docs/specs/20260327-999-dispatch.md", READY_TASK_SPEC)
+            _write_repo_file(root, "ai/doc/specs/20260327-999-dispatch.md", READY_TASK_SPEC)
 
             lifecycle_adapter = LifecycleCodexAdapter()
             adapter = FileSystemAdapter(root)
             dispatch_result = RuntimeEngine(adapter).run(
                 ExecutorDispatchNode(
                     ExecutorDispatchRequest(
-                        spec_path=Path("docs/specs/20260327-999-dispatch.md"),
+                        spec_path=Path("ai/doc/specs/20260327-999-dispatch.md"),
                         target=ExecutorTarget.CODEX,
                         mode=DispatchMode.SUBMIT,
                     ),
@@ -356,13 +356,13 @@ class ExecutorRunLifecycleNodeTests(unittest.TestCase):
     def test_poll_revisits_shell_run_from_persisted_receipt(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
-            _write_repo_file(root, "docs/specs/20260327-999-dispatch.md", READY_TASK_SPEC)
+            _write_repo_file(root, "ai/doc/specs/20260327-999-dispatch.md", READY_TASK_SPEC)
 
             adapter = FileSystemAdapter(root)
             dispatch_result = RuntimeEngine(adapter).run(
                 ExecutorDispatchNode(
                     ExecutorDispatchRequest(
-                        spec_path=Path("docs/specs/20260327-999-dispatch.md"),
+                        spec_path=Path("ai/doc/specs/20260327-999-dispatch.md"),
                         target=ExecutorTarget.SHELL,
                         mode=DispatchMode.ECHO,
                     )

@@ -49,7 +49,7 @@ READY_TASK_SPEC = """
 ## Metadata
 
 ### Source Plan / Request
-`docs/runtime/roadmap.md`
+`ai/doc/runtime/roadmap.md`
 
 ### Status
 `in-progress`
@@ -211,12 +211,12 @@ class ExecutorDispatchNodeTests(unittest.TestCase):
     def test_execute_rejects_non_ready_task_spec(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
-            _write_repo_file(root, "docs/specs/20260322-999-dispatch.md", BLOCKED_TASK_SPEC)
+            _write_repo_file(root, "ai/doc/specs/20260322-999-dispatch.md", BLOCKED_TASK_SPEC)
 
             adapter = FileSystemAdapter(root)
             result = ExecutorDispatchNode(
                 ExecutorDispatchRequest(
-                    spec_path=Path("docs/specs/20260322-999-dispatch.md"),
+                    spec_path=Path("ai/doc/specs/20260322-999-dispatch.md"),
                     mode=DispatchMode.PREVIEW,
                 )
             ).execute(adapter)
@@ -230,14 +230,14 @@ class ExecutorDispatchNodeTests(unittest.TestCase):
     def test_execute_previews_dispatch_for_ready_task_spec(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
-            _write_repo_file(root, "docs/specs/20260322-999-dispatch.md", READY_TASK_SPEC)
+            _write_repo_file(root, "ai/doc/specs/20260322-999-dispatch.md", READY_TASK_SPEC)
 
             adapter = FileSystemAdapter(root)
             engine = RuntimeEngine(adapter)
             result = engine.run(
                 ExecutorDispatchNode(
                     ExecutorDispatchRequest(
-                        spec_path=Path("docs/specs/20260322-999-dispatch.md"),
+                        spec_path=Path("ai/doc/specs/20260322-999-dispatch.md"),
                         mode=DispatchMode.PREVIEW,
                     )
                 )
@@ -258,12 +258,12 @@ class ExecutorDispatchNodeTests(unittest.TestCase):
     def test_execute_echo_dispatches_for_ready_task_spec(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
-            _write_repo_file(root, "docs/specs/20260322-999-dispatch.md", READY_TASK_SPEC)
+            _write_repo_file(root, "ai/doc/specs/20260322-999-dispatch.md", READY_TASK_SPEC)
 
             adapter = FileSystemAdapter(root)
             result = ExecutorDispatchNode(
                 ExecutorDispatchRequest(
-                    spec_path=Path("docs/specs/20260322-999-dispatch.md"),
+                    spec_path=Path("ai/doc/specs/20260322-999-dispatch.md"),
                     mode=DispatchMode.ECHO,
                 )
             ).execute(adapter)
@@ -279,12 +279,12 @@ class ExecutorDispatchNodeTests(unittest.TestCase):
     def test_execute_rejects_capability_mismatch_for_shell_executor(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
-            _write_repo_file(root, "docs/specs/20260322-999-dispatch.md", SHELL_REQUIRED_TASK_SPEC)
+            _write_repo_file(root, "ai/doc/specs/20260322-999-dispatch.md", SHELL_REQUIRED_TASK_SPEC)
 
             adapter = FileSystemAdapter(root)
             result = ExecutorDispatchNode(
                 ExecutorDispatchRequest(
-                    spec_path=Path("docs/specs/20260322-999-dispatch.md"),
+                    spec_path=Path("ai/doc/specs/20260322-999-dispatch.md"),
                     target=ExecutorTarget.SHELL,
                     mode=DispatchMode.PREVIEW,
                 )
@@ -298,13 +298,13 @@ class ExecutorDispatchNodeTests(unittest.TestCase):
     def test_execute_accepts_resume_requirement_for_resume_capable_codex_backend(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
-            _write_repo_file(root, "docs/specs/20260322-999-dispatch.md", RESUME_REQUIRED_TASK_SPEC)
+            _write_repo_file(root, "ai/doc/specs/20260322-999-dispatch.md", RESUME_REQUIRED_TASK_SPEC)
 
             backend = ResumeCapableCodexBackend()
             adapter = FileSystemAdapter(root)
             result = ExecutorDispatchNode(
                 ExecutorDispatchRequest(
-                    spec_path=Path("docs/specs/20260322-999-dispatch.md"),
+                    spec_path=Path("ai/doc/specs/20260322-999-dispatch.md"),
                     target=ExecutorTarget.CODEX,
                     mode=DispatchMode.SUBMIT,
                 ),
@@ -319,13 +319,13 @@ class ExecutorDispatchNodeTests(unittest.TestCase):
     def test_execute_submits_codex_dispatch_and_writes_execution_result(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
-            _write_repo_file(root, "docs/specs/20260322-999-dispatch.md", READY_TASK_SPEC)
+            _write_repo_file(root, "ai/doc/specs/20260322-999-dispatch.md", READY_TASK_SPEC)
 
             adapter = FileSystemAdapter(root)
             result = RuntimeEngine(adapter).run(
                 ExecutorDispatchNode(
                     ExecutorDispatchRequest(
-                        spec_path=Path("docs/specs/20260322-999-dispatch.md"),
+                        spec_path=Path("ai/doc/specs/20260322-999-dispatch.md"),
                         target=ExecutorTarget.CODEX,
                         mode=DispatchMode.SUBMIT,
                     )
@@ -347,12 +347,12 @@ class ExecutorDispatchNodeTests(unittest.TestCase):
     def test_execute_codex_failure_surfaces_repair_seed(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
-            _write_repo_file(root, "docs/specs/20260322-999-dispatch.md", READY_TASK_SPEC)
+            _write_repo_file(root, "ai/doc/specs/20260322-999-dispatch.md", READY_TASK_SPEC)
 
             adapter = FileSystemAdapter(root)
             result = ExecutorDispatchNode(
                 ExecutorDispatchRequest(
-                    spec_path=Path("docs/specs/20260322-999-dispatch.md"),
+                    spec_path=Path("ai/doc/specs/20260322-999-dispatch.md"),
                     target=ExecutorTarget.CODEX,
                     mode=DispatchMode.SUBMIT,
                 ),
@@ -368,14 +368,14 @@ class ExecutorDispatchNodeTests(unittest.TestCase):
     def test_execute_keeps_nonterminal_codex_run_in_running_state(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
-            _write_repo_file(root, "docs/specs/20260322-999-dispatch.md", READY_TASK_SPEC)
+            _write_repo_file(root, "ai/doc/specs/20260322-999-dispatch.md", READY_TASK_SPEC)
 
             pending_adapter = PendingCodexExecutorAdapter()
             adapter = FileSystemAdapter(root)
             result = RuntimeEngine(adapter).run(
                 ExecutorDispatchNode(
                     ExecutorDispatchRequest(
-                        spec_path=Path("docs/specs/20260322-999-dispatch.md"),
+                        spec_path=Path("ai/doc/specs/20260322-999-dispatch.md"),
                         target=ExecutorTarget.CODEX,
                         mode=DispatchMode.SUBMIT,
                     ),

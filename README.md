@@ -4,6 +4,8 @@
 
 The copied SOP remains the operating model for how this repository is planned, specified, implemented, validated, and written back. The runtime exists to consume those artifacts and turn them into narrow executable workflow steps.
 
+The copied SOP assets in this repository now live under `ai/` so they stay aligned with the upstream starter. Runtime-specific design docs remain under `ai/doc/runtime/*`, and task-local closeout notes remain under `ai/doc/change-summaries/*`.
+
 ## What this repository is for
 
 This repository establishes a practical runtime layer that can:
@@ -32,21 +34,36 @@ The copied SOP starter is still the canonical development model for this repo:
 
 See `AGENTS.md` for the full repository rules.
 
+The copied SOP layer in this repository now also includes:
+
+- the default lightweight `small task` path plus the optional phase-aware long-task path
+- a minimal `project/*` control surface for human recovery
+- the upstream `ai/README.md`, `ai/doc/*`, and `ai/skill/*` namespace layout
+
 ## Repository layout
 
 - `AGENTS.md`
   Canonical repository guidance. The copied SOP still governs how this repo is developed.
 
-- `docs/runtime/*`
+- `ai/README.md`
+  Namespace map for the copied SOP workflow layer under `ai/*`.
+
+- `project/*`
+  Recovery-first human control surface for current state, document roles, durable decisions, and experiments.
+
+- `ai/doc/runtime/*`
   Runtime-specific design artifacts: architecture, protocol, state machine, and roadmap.
 
-- `docs/specs/*`
+- `ai/doc/change-summaries/*`
+  Task-local delivery notes and closeout summaries.
+
+- `ai/doc/specs/*`
   Narrow execution contracts, including specs produced by the runtime.
 
-- `docs/facts/*`
+- `ai/doc/facts/*`
   Stable reusable project context.
 
-- `docs/guides/*`, `docs/templates/*`, `skills/*`
+- `ai/doc/guides/*`, `ai/doc/templates/*`, `ai/skill/*`
   The copied SOP starter materials that this runtime consumes and dogfoods.
 
 - `src/ai_engineering_runtime/*`
@@ -60,17 +77,17 @@ See `AGENTS.md` for the full repository rules.
 The current executable slice is:
 
 ```text
-ae-runtime plan-readiness-check --plan docs/runtime/roadmap.md
-ae-runtime task-spec-readiness-check --spec docs/specs/20260322-003-writeback-classifier.md
-ae-runtime plan-to-spec --plan docs/runtime/roadmap.md
-ae-runtime validation-collect --spec docs/specs/20260322-003-writeback-classifier.md --command-status passed --black-box-status passed
+ae-runtime plan-readiness-check --plan ai/doc/runtime/roadmap.md
+ae-runtime task-spec-readiness-check --spec ai/doc/specs/20260322-003-writeback-classifier.md
+ae-runtime plan-to-spec --plan ai/doc/runtime/roadmap.md
+ae-runtime validation-collect --spec ai/doc/specs/20260322-003-writeback-classifier.md --command-status passed --black-box-status passed
 ae-runtime writeback-classifier --text "..." --kind workflow_pattern
 ae-runtime followup-suggester --validation-status failed
-ae-runtime executor-dispatch --spec docs/specs/20260322-007-executor-dispatch-adapter-shell.md --mode preview
-ae-runtime executor-dispatch --spec docs/specs/20260327-001-executor-adapter-codex-v1.md --executor codex --mode submit
+ae-runtime executor-dispatch --spec ai/doc/specs/20260322-007-executor-dispatch-adapter-shell.md --mode preview
+ae-runtime executor-dispatch --spec ai/doc/specs/20260327-001-executor-adapter-codex-v1.md --executor codex --mode submit
 ae-runtime executor-run-lifecycle --run-id 20260327T120000000000-executor-dispatch --action poll
 ae-runtime result-log-replay --latest --node validation-collect
-ae-runtime run-history-select --spec docs/specs/20260322-005-validation-collect-foundation.md --node validation-collect
+ae-runtime run-history-select --spec ai/doc/specs/20260322-005-validation-collect-foundation.md --node validation-collect
 ae-runtime run-summary --latest --node validation-collect
 ae-runtime node-gate --node validation-rollup --run-id 20260322T191755447854-validation-collect
 ae-runtime validation-rollup --latest
@@ -83,13 +100,13 @@ Before installation, use the module form from the repository root:
 
 ```powershell
 $env:PYTHONPATH = "src"
-python -m ai_engineering_runtime plan-readiness-check --plan docs/runtime/roadmap.md
+python -m ai_engineering_runtime plan-readiness-check --plan ai/doc/runtime/roadmap.md
 ```
 
 Use `plan-readiness-check` to inspect a plan artifact and return a structured readiness outcome with stable reason codes.
 
 Use `plan-to-spec --dry-run` to preview the generated spec and readiness outcome without writing a spec file.
-Omit `--dry-run` to write the next dated spec under `docs/specs/`.
+Omit `--dry-run` to write the next dated spec under `ai/doc/specs/`.
 
 These commands currently:
 
@@ -128,14 +145,14 @@ Use one narrow local validation path for closeout work:
 python -m unittest discover -s tests -v
 
 $env:PYTHONPATH = "src"
-python -m ai_engineering_runtime plan-readiness-check --plan docs/runtime/roadmap.md
+python -m ai_engineering_runtime plan-readiness-check --plan ai/doc/runtime/roadmap.md
 ```
 
 If you also want to validate the installed console script path in the same environment:
 
 ```powershell
 python -m pip install -e .
-ae-runtime plan-readiness-check --plan docs/runtime/roadmap.md
+ae-runtime plan-readiness-check --plan ai/doc/runtime/roadmap.md
 ```
 
 ## What this repository is not
@@ -149,8 +166,10 @@ This repository is not:
 
 ## Where to look next
 
-1. read `AGENTS.md`
-2. read `docs/runtime/architecture.md`
-3. read `docs/runtime/roadmap.md`
-4. read `docs/specs/20260322-002-runtime-plan-readiness-check.md`
-5. run `$env:PYTHONPATH='src'; python -m ai_engineering_runtime plan-readiness-check --plan docs/runtime/roadmap.md`
+1. if you need the current operating state, read `project/CURRENT.md`
+2. read `AGENTS.md`
+3. read `ai/README.md`
+4. read `ai/doc/runtime/architecture.md`
+5. read `ai/doc/runtime/roadmap.md`
+6. for the copied SOP workflow layer, read `ai/doc/guides/new-project-sop.md` and `ai/doc/specs/README.md`
+7. run `$env:PYTHONPATH='src'; python -m ai_engineering_runtime plan-readiness-check --plan ai/doc/runtime/roadmap.md`

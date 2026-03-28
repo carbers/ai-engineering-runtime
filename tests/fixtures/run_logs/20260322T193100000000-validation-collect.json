@@ -7,7 +7,7 @@
   "output_path": null,
   "plan_path": null,
   "rendered_output": null,
-  "spec_path": "docs/specs/20260322-005-validation-collect-foundation.md",
+  "spec_path": "ai/doc/specs/20260322-005-validation-collect-foundation.md",
   "success": true,
   "to_state": "writeback-review",
   "validation": {

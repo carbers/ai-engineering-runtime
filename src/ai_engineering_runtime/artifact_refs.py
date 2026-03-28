@@ -126,15 +126,15 @@ def normalize_repo_relative_path(repo_root: Path, path: Path | str) -> str:
 
 def infer_artifact_ref_kind(path: str) -> ArtifactRefKind:
     normalized = path.replace("\\", "/")
-    if normalized.startswith("docs/runtime/"):
+    if normalized.startswith("ai/doc/runtime/"):
         return ArtifactRefKind.PLAN
-    if normalized.startswith("docs/specs/"):
+    if normalized.startswith("ai/doc/specs/"):
         return ArtifactRefKind.TASK_SPEC
-    if normalized.startswith("docs/facts/"):
+    if normalized.startswith("ai/doc/facts/"):
         return ArtifactRefKind.FACT
-    if normalized.startswith("skills/"):
+    if normalized.startswith("ai/skill/"):
         return ArtifactRefKind.SKILL
-    if normalized.startswith("docs/change-summaries/") or normalized.startswith("docs/summaries/"):
+    if normalized.startswith("ai/doc/change-summaries/") or normalized.startswith("docs/summaries/"):
         return ArtifactRefKind.CHANGE_SUMMARY
     if normalized.startswith(".runtime/runs/"):
         return ArtifactRefKind.RUN_LOG

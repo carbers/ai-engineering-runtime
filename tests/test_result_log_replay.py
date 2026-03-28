@@ -76,7 +76,7 @@ class ResultLogReplayNodeTests(unittest.TestCase):
             self.assertEqual(result.replay.artifact_target.kind, ArtifactTargetKind.SPEC)
             self.assertEqual(
                 result.replay.artifact_target.path,
-                "docs/specs/20260322-005-validation-collect-foundation.md",
+                "ai/doc/specs/20260322-005-validation-collect-foundation.md",
             )
             self.assertEqual(result.replay.ordered_at.isoformat(), "2026-03-22T19:17:55.447854")
             self.assertTrue(result.log_path.exists())
@@ -184,7 +184,7 @@ class RunLogReplayParsingTests(unittest.TestCase):
                     "from_state": "spec-ready",
                     "to_state": "executing",
                     "plan_path": None,
-                    "spec_path": "docs/specs/20260327-001-executor-adapter-codex-v1.md",
+                    "spec_path": "ai/doc/specs/20260327-001-executor-adapter-codex-v1.md",
                     "output_path": None,
                     "log_path": ".runtime/runs/20260327T120000000000-executor-dispatch.json",
                     "rendered_output": None,
@@ -233,7 +233,7 @@ class RunLogReplayParsingTests(unittest.TestCase):
                     "from_state": "spec-ready",
                     "to_state": "executing",
                     "plan_path": None,
-                    "spec_path": "docs/specs/20260327-001-executor-adapter-codex-v1.md",
+                    "spec_path": "ai/doc/specs/20260327-001-executor-adapter-codex-v1.md",
                     "output_path": None,
                     "log_path": ".runtime/runs/20260327T120000000001-executor-dispatch.json",
                     "rendered_output": None,
@@ -263,7 +263,7 @@ class RunLogReplayParsingTests(unittest.TestCase):
                                 "supports_resume": False,
                             },
                         },
-                        "spec_identity": "docs/specs/20260327-001-executor-adapter-codex-v1.md",
+                        "spec_identity": "ai/doc/specs/20260327-001-executor-adapter-codex-v1.md",
                         "dispatch_summary": {
                             "title": "Dispatch Sample",
                             "goal": "Hand off a narrow task safely.",

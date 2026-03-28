@@ -126,13 +126,13 @@ class CliTests(unittest.TestCase):
     def test_plan_readiness_check_reports_ready(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
-            _write_repo_file(root, "docs/runtime/roadmap.md", VALID_ROADMAP)
+            _write_repo_file(root, "ai/doc/runtime/roadmap.md", VALID_ROADMAP)
 
             stdout = io.StringIO()
             stderr = io.StringIO()
             with redirect_stdout(stdout), redirect_stderr(stderr):
                 exit_code = main(
-                    ["plan-readiness-check", "--plan", "docs/runtime/roadmap.md"],
+                    ["plan-readiness-check", "--plan", "ai/doc/runtime/roadmap.md"],
                     repo_root=root,
                     today=date(2026, 3, 22),
                 )
@@ -150,13 +150,13 @@ class CliTests(unittest.TestCase):
                 "### Done When\nThe CLI turns this roadmap into a draft spec.\n\n",
                 "### Done When\nTBD after the acceptance criteria are clarified.\n\n",
             )
-            _write_repo_file(root, "docs/runtime/roadmap.md", clarification_roadmap)
+            _write_repo_file(root, "ai/doc/runtime/roadmap.md", clarification_roadmap)
 
             stdout = io.StringIO()
             stderr = io.StringIO()
             with redirect_stdout(stdout), redirect_stderr(stderr):
                 exit_code = main(
-                    ["plan-readiness-check", "--plan", "docs/runtime/roadmap.md"],
+                    ["plan-readiness-check", "--plan", "ai/doc/runtime/roadmap.md"],
                     repo_root=root,
                     today=date(2026, 3, 22),
                 )
@@ -176,7 +176,7 @@ class CliTests(unittest.TestCase):
             ## Metadata
 
             ### Source Plan / Request
-            `docs/runtime/roadmap.md`
+            `ai/doc/runtime/roadmap.md`
 
             ### Status
             `draft`
@@ -222,13 +222,13 @@ class CliTests(unittest.TestCase):
             ## Risks / Notes
             - keep it small
             """
-            _write_repo_file(root, "docs/specs/20260322-999-sample.md", task_spec)
+            _write_repo_file(root, "ai/doc/specs/20260322-999-sample.md", task_spec)
 
             stdout = io.StringIO()
             stderr = io.StringIO()
             with redirect_stdout(stdout), redirect_stderr(stderr):
                 exit_code = main(
-                    ["task-spec-readiness-check", "--spec", "docs/specs/20260322-999-sample.md"],
+                    ["task-spec-readiness-check", "--spec", "ai/doc/specs/20260322-999-sample.md"],
                     repo_root=root,
                     today=date(2026, 3, 22),
                 )
@@ -236,7 +236,7 @@ class CliTests(unittest.TestCase):
             self.assertEqual(exit_code, 0)
             self.assertEqual(stderr.getvalue(), "")
             self.assertIn("task-spec-readiness-check completed", stdout.getvalue())
-            self.assertIn("Spec: docs/specs/20260322-999-sample.md", stdout.getvalue())
+            self.assertIn("Spec: ai/doc/specs/20260322-999-sample.md", stdout.getvalue())
             self.assertIn("Readiness: ready", stdout.getvalue())
 
     def test_validation_collect_reports_passed(self) -> None:
@@ -248,7 +248,7 @@ class CliTests(unittest.TestCase):
             ## Metadata
 
             ### Source Plan / Request
-            `docs/runtime/roadmap.md`
+            `ai/doc/runtime/roadmap.md`
 
             ### Status
             `done`
@@ -294,7 +294,7 @@ class CliTests(unittest.TestCase):
             ## Risks / Notes
             - keep it small
             """
-            _write_repo_file(root, "docs/specs/20260322-999-validation.md", task_spec)
+            _write_repo_file(root, "ai/doc/specs/20260322-999-validation.md", task_spec)
 
             stdout = io.StringIO()
             stderr = io.StringIO()
@@ -303,7 +303,7 @@ class CliTests(unittest.TestCase):
                     [
                         "validation-collect",
                         "--spec",
-                        "docs/specs/20260322-999-validation.md",
+                        "ai/doc/specs/20260322-999-validation.md",
                         "--command-status",
                         "passed",
                         "--black-box-status",
@@ -353,7 +353,7 @@ class CliTests(unittest.TestCase):
             ## Metadata
 
             ### Source Plan / Request
-            `docs/runtime/roadmap.md`
+            `ai/doc/runtime/roadmap.md`
 
             ### Status
             `in-progress`
@@ -399,7 +399,7 @@ class CliTests(unittest.TestCase):
             ## Risks / Notes
             - keep it small
             """
-            _write_repo_file(root, "docs/specs/20260322-999-dispatch.md", task_spec)
+            _write_repo_file(root, "ai/doc/specs/20260322-999-dispatch.md", task_spec)
 
             stdout = io.StringIO()
             stderr = io.StringIO()
@@ -408,7 +408,7 @@ class CliTests(unittest.TestCase):
                     [
                         "executor-dispatch",
                         "--spec",
-                        "docs/specs/20260322-999-dispatch.md",
+                        "ai/doc/specs/20260322-999-dispatch.md",
                         "--mode",
                         "preview",
                     ],
@@ -432,7 +432,7 @@ class CliTests(unittest.TestCase):
             ## Metadata
 
             ### Source Plan / Request
-            `docs/runtime/roadmap.md`
+            `ai/doc/runtime/roadmap.md`
 
             ### Status
             `in-progress`
@@ -487,7 +487,7 @@ class CliTests(unittest.TestCase):
             ## Risks / Notes
             - keep it small
             """
-            _write_repo_file(root, "docs/specs/20260322-999-codex-dispatch.md", task_spec)
+            _write_repo_file(root, "ai/doc/specs/20260322-999-codex-dispatch.md", task_spec)
 
             stdout = io.StringIO()
             stderr = io.StringIO()
@@ -496,7 +496,7 @@ class CliTests(unittest.TestCase):
                     [
                         "executor-dispatch",
                         "--spec",
-                        "docs/specs/20260322-999-codex-dispatch.md",
+                        "ai/doc/specs/20260322-999-codex-dispatch.md",
                         "--executor",
                         "codex",
                         "--mode",
@@ -523,7 +523,7 @@ class CliTests(unittest.TestCase):
             ## Metadata
 
             ### Source Plan / Request
-            `docs/runtime/roadmap.md`
+            `ai/doc/runtime/roadmap.md`
 
             ### Status
             `in-progress`
@@ -578,7 +578,7 @@ class CliTests(unittest.TestCase):
             ## Risks / Notes
             - keep it small
             """
-            _write_repo_file(root, "docs/specs/20260322-999-codex-dispatch.md", task_spec)
+            _write_repo_file(root, "ai/doc/specs/20260322-999-codex-dispatch.md", task_spec)
 
             dispatch_stdout = io.StringIO()
             dispatch_stderr = io.StringIO()
@@ -587,7 +587,7 @@ class CliTests(unittest.TestCase):
                     [
                         "executor-dispatch",
                         "--spec",
-                        "docs/specs/20260322-999-codex-dispatch.md",
+                        "ai/doc/specs/20260322-999-codex-dispatch.md",
                         "--executor",
                         "codex",
                         "--mode",
@@ -628,13 +628,13 @@ class CliTests(unittest.TestCase):
     def test_main_reports_success_and_writes_spec(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
-            _write_repo_file(root, "docs/runtime/roadmap.md", VALID_ROADMAP)
+            _write_repo_file(root, "ai/doc/runtime/roadmap.md", VALID_ROADMAP)
 
             stdout = io.StringIO()
             stderr = io.StringIO()
             with redirect_stdout(stdout), redirect_stderr(stderr):
                 exit_code = main(
-                    ["plan-to-spec", "--plan", "docs/runtime/roadmap.md"],
+                    ["plan-to-spec", "--plan", "ai/doc/runtime/roadmap.md"],
                     repo_root=root,
                     today=date(2026, 3, 22),
                 )
@@ -645,20 +645,20 @@ class CliTests(unittest.TestCase):
             self.assertIn("Readiness: ready", stdout.getvalue())
             self.assertIn("State: spec-ready", stdout.getvalue())
             self.assertIn(
-                "Spec: docs/specs/20260322-001-runtime-plan-to-spec-foundation.md",
+                "Spec: ai/doc/specs/20260322-001-runtime-plan-to-spec-foundation.md",
                 stdout.getvalue(),
             )
 
     def test_main_dry_run_prints_rendered_spec(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
-            _write_repo_file(root, "docs/runtime/roadmap.md", VALID_ROADMAP)
+            _write_repo_file(root, "ai/doc/runtime/roadmap.md", VALID_ROADMAP)
 
             stdout = io.StringIO()
             stderr = io.StringIO()
             with redirect_stdout(stdout), redirect_stderr(stderr):
                 exit_code = main(
-                    ["plan-to-spec", "--plan", "docs/runtime/roadmap.md", "--dry-run"],
+                    ["plan-to-spec", "--plan", "ai/doc/runtime/roadmap.md", "--dry-run"],
                     repo_root=root,
                     today=date(2026, 3, 22),
                 )
@@ -674,13 +674,13 @@ class CliTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             invalid_roadmap = VALID_ROADMAP.replace("### Done When\nThe CLI turns this roadmap into a draft spec.\n\n", "")
-            _write_repo_file(root, "docs/runtime/roadmap.md", invalid_roadmap)
+            _write_repo_file(root, "ai/doc/runtime/roadmap.md", invalid_roadmap)
 
             stdout = io.StringIO()
             stderr = io.StringIO()
             with redirect_stdout(stdout), redirect_stderr(stderr):
                 exit_code = main(
-                    ["plan-to-spec", "--plan", "docs/runtime/roadmap.md"],
+                    ["plan-to-spec", "--plan", "ai/doc/runtime/roadmap.md"],
                     repo_root=root,
                     today=date(2026, 3, 22),
                 )
@@ -694,7 +694,7 @@ class CliTests(unittest.TestCase):
     def test_main_reports_runtime_io_errors_to_stderr(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
-            _write_repo_file(root, "docs/runtime/roadmap.md", VALID_ROADMAP)
+            _write_repo_file(root, "ai/doc/runtime/roadmap.md", VALID_ROADMAP)
 
             stdout = io.StringIO()
             stderr = io.StringIO()
@@ -704,7 +704,7 @@ class CliTests(unittest.TestCase):
                 redirect_stderr(stderr),
             ):
                 exit_code = main(
-                    ["plan-readiness-check", "--plan", "docs/runtime/roadmap.md"],
+                    ["plan-readiness-check", "--plan", "ai/doc/runtime/roadmap.md"],
                     repo_root=root,
                     today=date(2026, 3, 22),
                 )
@@ -802,7 +802,7 @@ class CliTests(unittest.TestCase):
                     [
                         "run-history-select",
                         "--spec",
-                        "docs/specs/20260322-005-validation-collect-foundation.md",
+                        "ai/doc/specs/20260322-005-validation-collect-foundation.md",
                         "--node",
                         "validation-collect",
                         "--limit",

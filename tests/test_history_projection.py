@@ -34,7 +34,7 @@ class HistoryProjectionTests(unittest.TestCase):
                     node_name="validation-collect",
                     artifact_target=ArtifactTarget(
                         ArtifactTargetKind.SPEC,
-                        "docs/specs/20260322-005-validation-collect-foundation.md",
+                        "ai/doc/specs/20260322-005-validation-collect-foundation.md",
                     ),
                     signal_kind=ReplaySignalKind.VALIDATION,
                     signal_value="passed",
@@ -46,7 +46,7 @@ class HistoryProjectionTests(unittest.TestCase):
                     node_name="validation-collect",
                     artifact_target=ArtifactTarget(
                         ArtifactTargetKind.SPEC,
-                        "docs/specs/20260322-005-validation-collect-foundation.md",
+                        "ai/doc/specs/20260322-005-validation-collect-foundation.md",
                     ),
                     signal_kind=ReplaySignalKind.VALIDATION,
                     signal_value="incomplete",

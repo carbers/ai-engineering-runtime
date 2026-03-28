@@ -30,10 +30,10 @@ class ArtifactRefTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
 
-            plan_ref = artifact_ref_from_path(root, Path("docs/runtime/roadmap.md"))
-            spec_ref = artifact_ref_from_path(root, Path("docs/specs/20260322-999-sample.md"))
-            fact_ref = artifact_ref_from_path(root, Path("docs/facts/current-scope.md"))
-            skill_ref = artifact_ref_from_path(root, Path("skills/spec-normalization/SKILL.md"))
+            plan_ref = artifact_ref_from_path(root, Path("ai/doc/runtime/roadmap.md"))
+            spec_ref = artifact_ref_from_path(root, Path("ai/doc/specs/20260322-999-sample.md"))
+            fact_ref = artifact_ref_from_path(root, Path("ai/doc/facts/current-scope.md"))
+            skill_ref = artifact_ref_from_path(root, Path("ai/skill/spec-normalization/SKILL.md"))
 
             self.assertEqual(plan_ref.kind, ArtifactRefKind.PLAN)
             self.assertEqual(spec_ref.kind, ArtifactRefKind.TASK_SPEC)
@@ -69,12 +69,12 @@ class ArtifactRefTests(unittest.TestCase):
                 root,
                 ArtifactTarget(
                     kind=ArtifactTargetKind.SPEC,
-                    path="docs/specs/20260322-005-validation-collect-foundation.md",
+                    path="ai/doc/specs/20260322-005-validation-collect-foundation.md",
                 ),
             )
 
             self.assertEqual(ref.kind, ArtifactRefKind.TASK_SPEC)
-            self.assertEqual(ref.path, "docs/specs/20260322-005-validation-collect-foundation.md")
+            self.assertEqual(ref.path, "ai/doc/specs/20260322-005-validation-collect-foundation.md")
 
 
 if __name__ == "__main__":

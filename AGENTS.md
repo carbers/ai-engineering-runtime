@@ -30,32 +30,53 @@ Use the repository layers as follows:
 - `CLAUDE.md`
   Lightweight adapter that defers to `AGENTS.md`.
 
-- `docs/runtime/*`
+- `ai/README.md`
+  Namespace map for the copied SOP workflow layer under `ai/*`.
+
+- `project/*`
+  Minimal human-facing control surface for current state, durable project-level decisions, and experiment summaries that help people recover context quickly.
+
+- `ai/doc/runtime/*`
   Runtime-specific architecture, protocol, state-machine, and roadmap documents.
+
+- `ai/doc/change-summaries/*`
+  Task-local delivery notes kept for reviewable closeout history.
 
 - `.cursor/rules/*`
   Execution guardrails for Cursor.
 
-- `docs/guides/*`
+- `ai/doc/guides/*`
   Practical workflow guidance.
 
-- `docs/templates/*`
+- `ai/doc/templates/*`
   Reusable document skeletons used during work.
 
-- `docs/specs/*`
+- `ai/doc/specs/*`
   Task specs that bridge plans and implementation.
 
-- `docs/facts/*`
+- `ai/doc/facts/*`
   Stable context worth re-reading later.
 
-- `skills/*`
+- `ai/skill/*`
   Reusable workflows that reduce repeated cognitive work.
+
+`ai/` is reserved for AI-managed workflow assets.
+Runtime-specific design docs and task-local closeout notes live under `ai/doc/runtime/*` and `ai/doc/change-summaries/*` in this repository.
+The canonical namespace roots are singular: use `ai/doc` and `ai/skill`, not parallel roots such as `ai/docs` or `ai/skills`.
 
 - `src/ai_engineering_runtime/*`
   Runtime implementation organized around protocol, state, node, adapter, engine, and CLI layers.
 
 - `tests/*`
   Explicit validation for the implemented runtime slices.
+
+## Entrypoint model
+
+- `README.md` is the human-facing repository entrypoint.
+- `project/CURRENT.md` is the recovery-first entry for current human-facing project state when a project control surface exists.
+- `AGENTS.md` is the canonical AI-tool entrypoint.
+- Adapter files such as `CLAUDE.md` should defer to `AGENTS.md`.
+- `ai/README.md` documents the copied SOP workflow layer after the AI tool has entered through its adapter or `AGENTS.md`.
 
 ## Working model
 
@@ -72,8 +93,10 @@ Follow this operating sequence by default:
 
 When a plan or phase slice exists, the default execution path is `plan -> one or more task specs -> implementation -> validation`.
 A plan may come from an interactive planning session or a written plan document.
-Use `docs/templates/plan-template.md` only when the plan should become a durable repo artifact worth re-reading, sharing, or handing off.
+Use `ai/doc/templates/plan-template.md` only when the plan should become a durable repo artifact worth re-reading, sharing, or handing off.
 Plans may remain temporary. The task spec is the default durable execution artifact for implementation and iteration.
+When work spans multiple phases, milestones, or long-running slices, keep the hierarchy explicit as `project_target -> current_target -> phase -> plan -> task`.
+Keep project and phase intent in the planning layer. Do not let task execution quietly redefine those boundaries.
 If iterating within the same reviewable slice, refine the existing spec.
 If the primary outcome, boundary, or validation path changes, create a new dated spec first.
 Only tiny task requests that are already effectively spec-complete and trivially narrow may skip spec creation.
@@ -91,6 +114,7 @@ Use change summaries for task-local delivery notes. Do not turn them into perman
 - Do not implement full autonomy, PR automation, or merge automation in early slices.
 - Do not add speculative abstractions.
 - Do not expand a task because a broader redesign seems attractive.
+- Do not let task or sub-plan execution expand project or phase scope without an explicit replan or decision.
 - Do not turn temporary reasoning into permanent documentation.
 - Do not duplicate the same explanation across many files.
 - Do not let facts become an archive of every conversation.
@@ -109,9 +133,11 @@ Good write-back targets include:
 
 Route write-back to the right layer:
 
-- `docs/facts/*` for stable reusable project context
-- `skills/*` for repeatable workflows
+- `ai/doc/facts/*` for stable reusable project context
+- `ai/skill/*` for repeatable workflows
 - `AGENTS.md` or `.cursor/rules/*` only for repository-wide operating guidance
+
+When adding, removing, or renaming fact files, keep `ai/doc/facts/facts-index.md` in sync.
 
 Do not write back:
 
@@ -130,9 +156,23 @@ If the answer is not clearly yes, do not write it back.
 
 Facts are stable context, not an archive.
 
+## Project control sync rule
+
+When a change produces a durable shift in current phase, active slice, frozen decision, or experiment status, update the appropriate file under `project/*` in the same change.
+
+Use:
+
+- `project/CURRENT.md` for current operating state
+- `project/DOC_MAP.md` when the reading order or document roles change
+- `project/decisions/*` for frozen project-level decisions worth re-reading later
+- `project/experiments/*` for experiment runs and readable summaries
+
+Do not route temporary task chatter into `project/*`.
+Do not use `ai/doc/facts/*` as the project's current-status dashboard.
+
 ## Skill promotion rule
 
-Promote a workflow into `skills/*` when:
+Promote a workflow into `ai/skill/*` when:
 
 - it repeats across tasks
 - its inputs and outputs are recognizable
@@ -141,6 +181,7 @@ Promote a workflow into `skills/*` when:
 - it can be described clearly enough to reuse
 
 Do not create a new skill for every useful prompt.
+When adding, removing, or renaming skills, keep `ai/skill/skill-registry.md` in sync.
 
 ## Validation expectations
 

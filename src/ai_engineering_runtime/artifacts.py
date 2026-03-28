@@ -243,15 +243,15 @@ def discover_artifacts(repo_root: Path) -> list[ArtifactRef]:
     root = repo_root.resolve()
     artifacts: list[ArtifactRef] = []
 
-    roadmap = root / "docs" / "runtime" / "roadmap.md"
+    roadmap = root / "ai" / "doc" / "runtime" / "roadmap.md"
     if roadmap.exists():
         artifacts.append(ArtifactRef(kind=ArtifactKind.PLAN, path=roadmap))
 
-    artifacts.extend(_discover_glob(root / "docs" / "specs", "*.md", ArtifactKind.TASK_SPEC))
-    artifacts.extend(_discover_glob(root / "docs" / "facts", "*.md", ArtifactKind.FACT))
-    artifacts.extend(_discover_glob(root / "skills", "*.md", ArtifactKind.SKILL))
+    artifacts.extend(_discover_glob(root / "ai" / "doc" / "specs", "*.md", ArtifactKind.TASK_SPEC))
+    artifacts.extend(_discover_glob(root / "ai" / "doc" / "facts", "*.md", ArtifactKind.FACT))
+    artifacts.extend(_discover_glob(root / "ai" / "skill", "*.md", ArtifactKind.SKILL))
 
-    for summary_dir in (root / "docs" / "change-summaries", root / "docs" / "summaries"):
+    for summary_dir in (root / "ai" / "doc" / "change-summaries", root / "docs" / "summaries"):
         artifacts.extend(_discover_glob(summary_dir, "*.md", ArtifactKind.CHANGE_SUMMARY))
 
     return artifacts

@@ -36,7 +36,7 @@ WHITE_BOX_TASK_SPEC = """
 ## Metadata
 
 ### Source Plan / Request
-`docs/runtime/roadmap.md`
+`ai/doc/runtime/roadmap.md`
 
 ### Status
 `done`
@@ -94,14 +94,14 @@ class ValidationCollectNodeTests(unittest.TestCase):
     def test_execute_reports_passed_for_complete_validation_evidence(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
-            _write_repo_file(root, "docs/specs/20260322-999-validation.md", WHITE_BOX_TASK_SPEC)
+            _write_repo_file(root, "ai/doc/specs/20260322-999-validation.md", WHITE_BOX_TASK_SPEC)
 
             adapter = FileSystemAdapter(root)
             engine = RuntimeEngine(adapter)
             result = engine.run(
                 ValidationCollectNode(
                     ValidationCollectRequest(
-                        spec_path=Path("docs/specs/20260322-999-validation.md"),
+                        spec_path=Path("ai/doc/specs/20260322-999-validation.md"),
                         command_status=ValidationEvidenceStatus.PASSED,
                         black_box_status=ValidationEvidenceStatus.PASSED,
                         white_box_status=ValidationEvidenceStatus.PASSED,
@@ -124,12 +124,12 @@ class ValidationCollectNodeTests(unittest.TestCase):
     def test_execute_reports_failed_for_failing_command_evidence(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
-            _write_repo_file(root, "docs/specs/20260322-999-validation.md", WHITE_BOX_TASK_SPEC)
+            _write_repo_file(root, "ai/doc/specs/20260322-999-validation.md", WHITE_BOX_TASK_SPEC)
 
             adapter = FileSystemAdapter(root)
             result = ValidationCollectNode(
                 ValidationCollectRequest(
-                    spec_path=Path("docs/specs/20260322-999-validation.md"),
+                    spec_path=Path("ai/doc/specs/20260322-999-validation.md"),
                     command_status=ValidationEvidenceStatus.FAILED,
                     black_box_status=ValidationEvidenceStatus.PASSED,
                     white_box_status=ValidationEvidenceStatus.PASSED,
@@ -145,12 +145,12 @@ class ValidationCollectNodeTests(unittest.TestCase):
     def test_execute_reports_incomplete_when_required_white_box_evidence_is_missing(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
-            _write_repo_file(root, "docs/specs/20260322-999-validation.md", WHITE_BOX_TASK_SPEC)
+            _write_repo_file(root, "ai/doc/specs/20260322-999-validation.md", WHITE_BOX_TASK_SPEC)
 
             adapter = FileSystemAdapter(root)
             result = ValidationCollectNode(
                 ValidationCollectRequest(
-                    spec_path=Path("docs/specs/20260322-999-validation.md"),
+                    spec_path=Path("ai/doc/specs/20260322-999-validation.md"),
                     command_status=ValidationEvidenceStatus.PASSED,
                     black_box_status=ValidationEvidenceStatus.PASSED,
                 )
@@ -169,7 +169,7 @@ class ValidationCollectNodeTests(unittest.TestCase):
             adapter = FileSystemAdapter(root)
             result = ValidationCollectNode(
                 ValidationCollectRequest(
-                    spec_path=Path("docs/specs/missing.md"),
+                    spec_path=Path("ai/doc/specs/missing.md"),
                     command_status=ValidationEvidenceStatus.PASSED,
                 )
             ).execute(adapter)

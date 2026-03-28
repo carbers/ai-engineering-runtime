@@ -261,9 +261,9 @@ def _resolve_related_validation_rollup_ref(
 
 def _suggested_next_action(destination: WritebackDestination) -> str | None:
     if destination is WritebackDestination.FACTS:
-        return "Review the candidate and write the stable context into docs/facts/."
+        return "Review the candidate and write the stable context into ai/doc/facts/."
     if destination is WritebackDestination.SKILLS:
-        return "Review the candidate and promote the reusable workflow into skills/."
+        return "Review the candidate and promote the reusable workflow into ai/skill/."
     if destination is WritebackDestination.CHANGE_SUMMARY_ONLY:
         return "Keep the note in the task closeout or change summary only."
     return None

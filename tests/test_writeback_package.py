@@ -47,7 +47,7 @@ class WritebackPackageTests(unittest.TestCase):
             self.assertIsNotNone(package)
             self.assertEqual(package.destination, WritebackDestination.FACTS)
             self.assertTrue(package.actionable)
-            self.assertIn("docs/facts", package.suggested_next_action)
+            self.assertIn("ai/doc/facts", package.suggested_next_action)
 
     def test_builds_actionable_skills_package(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -70,7 +70,7 @@ class WritebackPackageTests(unittest.TestCase):
             self.assertIsNotNone(package)
             self.assertEqual(package.destination, WritebackDestination.SKILLS)
             self.assertTrue(package.actionable)
-            self.assertIn("skills/", package.suggested_next_action)
+            self.assertIn("ai/skill/", package.suggested_next_action)
 
     def test_builds_non_actionable_change_summary_only_package(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

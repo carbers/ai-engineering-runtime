@@ -257,9 +257,9 @@ def _suggested_next_step(action: FollowupAction) -> str | None:
     if action is FollowupAction.FIX_VALIDATION_FAILURE:
         return "Create or execute a fix-focused task before resuming the workflow."
     if action is FollowupAction.WRITE_BACK_STABLE_CONTEXT:
-        return "Review the stable context and write it into docs/facts/."
+        return "Review the stable context and write it into ai/doc/facts/."
     if action is FollowupAction.PROMOTE_SKILL_CANDIDATE:
-        return "Review the workflow and promote it into skills/."
+        return "Review the workflow and promote it into ai/skill/."
     if action is FollowupAction.IMPLEMENT_NEXT_TASK:
         return "Continue with the next narrow task."
     return None
