@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import UTC, datetime
 from enum import Enum
 import json
 from pathlib import Path
+from uuid import uuid4
 
 from ai_engineering_runtime.handoffs import (
     ArtifactCategory,
@@ -449,6 +450,25 @@ class ProductCommandResult:
     rendered_output: str | None = None
 
 
+@dataclass(frozen=True)
+class ProductRunCatalog:
+    runs: tuple[ProductRunState, ...] = ()
+    skipped_runs: tuple[str, ...] = ()
+
+
+def _utc_now() -> datetime:
+    return datetime.now(UTC)
+
+
+def _utc_timestamp() -> str:
+    return _utc_now().isoformat(timespec="seconds")
+
+
+def _new_run_id(workflow_id: str, *, now: datetime | None = None) -> str:
+    current = now or _utc_now()
+    return f"{current.strftime('%Y%m%dT%H%M%S')}-{workflow_id}-{uuid4().hex[:8]}"
+
+
 def workflow_definitions() -> dict[str, WorkflowDefinition]:
     retry_standard = RetryPolicy(
         max_attempts=2,
@@ -621,8 +641,9 @@ def run_from_handoff(
                 ),
             ),
         )
-    now = datetime.utcnow().isoformat(timespec="seconds")
-    run_id = datetime.utcnow().strftime("%Y%m%dT%H%M%S") + f"-{workflow.workflow_id}"
+    current_time = _utc_now()
+    now = current_time.isoformat(timespec="seconds")
+    run_id = _new_run_id(workflow.workflow_id, now=current_time)
     state = ProductRunState(
         run_id=run_id,
         workflow_id=workflow.workflow_id,
@@ -740,7 +761,7 @@ def close_run(adapter, run_id: str) -> ProductCommandResult:
             ),
         )
     refreshed.status = "complete"
-    refreshed.updated_at = datetime.utcnow().isoformat(timespec="seconds")
+    refreshed.updated_at = _utc_timestamp()
     refreshed.last_node_id = "closeout"
     refreshed.last_executor_name = None
     refreshed.event_log = refreshed.event_log + ("closeout:run-closed",)
@@ -770,8 +791,23 @@ def load_product_run(adapter, run_id: str) -> ProductRunState | None:
     path = adapter.build_product_run_path(run_id)
     if not path.exists():
         return None
-    payload = json.loads(path.read_text(encoding="utf-8"))
-    return ProductRunState.from_record(payload)
+    return _load_product_run_path(path)
+
+
+def list_product_runs(adapter) -> ProductRunCatalog:
+    run_dir = adapter.repo_root / ".runtime" / "product-runs"
+    if not run_dir.exists():
+        return ProductRunCatalog()
+
+    runs: list[ProductRunState] = []
+    skipped_runs: list[str] = []
+    for path in sorted(run_dir.glob("*.json")):
+        try:
+            runs.append(_load_product_run_path(path))
+        except ValueError:
+            skipped_runs.append(path.name)
+    runs.sort(key=lambda state: (state.updated_at, state.created_at, state.run_id), reverse=True)
+    return ProductRunCatalog(runs=tuple(runs), skipped_runs=tuple(skipped_runs))
 
 
 def refresh_run_state(state: ProductRunState) -> ProductRunState:
@@ -799,7 +835,7 @@ def refresh_run_state(state: ProductRunState) -> ProductRunState:
         workflow_id=state.workflow_id,
         handoff=state.handoff,
         created_at=state.created_at,
-        updated_at=datetime.utcnow().isoformat(timespec="seconds"),
+        updated_at=_utc_timestamp(),
         lanes=_update_lane_actions(state.lanes, decision, active_lane.lane_id if active_lane is not None else None),
         gates=gates,
         decision=decision,
@@ -1143,10 +1179,12 @@ def render_state_summary(state: ProductRunState) -> str:
     lines = [
         f"Run: {state.run_id}",
         f"Workflow: {state.workflow_id}",
+        f"Updated: {state.updated_at}",
         f"Current Phase: {active_lane.parent_phase if active_lane is not None else state.handoff.phase_hint or 'unknown'}",
         f"Request: {state.handoff.request_summary}",
         f"Status: {state.status}",
     ]
+    lines.extend(_render_workflow_trace(state))
     if active_lane is not None:
         lines.append(f"Active Lane: {active_lane.lane_id} ({active_lane.parent_phase})")
     parked = [lane.lane_id for lane in state.lanes if lane.status is LaneStatus.PARKED]
@@ -1216,6 +1254,36 @@ def render_state_summary(state: ProductRunState) -> str:
     return "\n".join(lines)
 
 
+def render_product_run_catalog(catalog: ProductRunCatalog, *, limit: int | None = None) -> str:
+    visible_runs = catalog.runs[:limit] if limit is not None else catalog.runs
+    heading = f"Product Runs: {len(visible_runs)}"
+    if limit is not None and len(catalog.runs) > len(visible_runs):
+        heading += f" (showing {len(visible_runs)} of {len(catalog.runs)})"
+    lines = [heading]
+    for state in visible_runs:
+        active_lane = _active_lane(state.lanes)
+        blocking_findings = sum(
+            1 for finding in state.open_findings if finding.is_blocking and finding.status is ReviewFindingStatus.OPEN
+        )
+        parts = [
+            state.run_id,
+            state.status,
+            state.workflow_id,
+            f"phase={active_lane.parent_phase if active_lane is not None else state.handoff.phase_hint or 'unknown'}",
+            f"action={state.decision.default_action}",
+            f"blocking_findings={blocking_findings}",
+            f"updated={state.updated_at}",
+        ]
+        if active_lane is not None:
+            parts.append(f"lane={active_lane.lane_id}")
+        if state.last_node_id is not None:
+            parts.append(f"last_node={state.last_node_id}")
+        lines.append("- " + " | ".join(parts))
+    if catalog.skipped_runs:
+        lines.append("Skipped Invalid Runs: " + ", ".join(catalog.skipped_runs))
+    return "\n".join(lines)
+
+
 def _execute_node(
     adapter,
     state: ProductRunState,
@@ -1260,7 +1328,7 @@ def _execute_node(
             workflow_id=state.workflow_id,
             handoff=state.handoff,
             created_at=state.created_at,
-            updated_at=datetime.utcnow().isoformat(timespec="seconds"),
+            updated_at=_utc_timestamp(),
             lanes=updated_lane,
             gates=state.gates,
             decision=state.decision,
@@ -1289,7 +1357,7 @@ def _execute_node(
         workflow_id=state.workflow_id,
         handoff=state.handoff,
         created_at=state.created_at,
-        updated_at=datetime.utcnow().isoformat(timespec="seconds"),
+        updated_at=_utc_timestamp(),
         lanes=_set_active_lane_status(state.lanes, updated_lane_status),
         gates=state.gates,
         decision=state.decision,
@@ -1472,6 +1540,60 @@ def _timeline_event_for_node(node_id: str, executor_name: str) -> str:
     if node_id == "repair-dispatch":
         return f"repair:{node_id}:{executor_name}"
     return f"node:{node_id}:{executor_name}"
+
+
+def _render_workflow_trace(state: ProductRunState) -> list[str]:
+    workflow = workflow_definitions().get(state.workflow_id)
+    if workflow is None:
+        return []
+    lines: list[str] = []
+    if workflow.phases:
+        lines.append("Workflow Phases: " + " -> ".join(workflow.phases))
+    if workflow.nodes:
+        lines.append("Workflow Nodes: " + " -> ".join(node.node_id for node in workflow.nodes))
+    if state.last_node_id is not None:
+        lines.append(f"Current Node: {state.last_node_id}")
+    suggested_node = _suggested_node_for_action(state)
+    if suggested_node is not None and suggested_node != state.last_node_id:
+        lines.append(f"Suggested Node: {suggested_node}")
+    return lines
+
+
+def _suggested_node_for_action(state: ProductRunState) -> str | None:
+    workflow = workflow_definitions().get(state.workflow_id)
+    if workflow is None:
+        return None
+    action = state.decision.default_action
+    if workflow.node(action) is not None:
+        return action
+    if action == "close-run" and workflow.node("closeout") is not None:
+        return "closeout"
+    if action.startswith("dispatch-"):
+        preferred_node = state.handoff.initial_execution_intent.preferred_node
+        if workflow.node(preferred_node) is not None:
+            return preferred_node
+        if workflow.node("executor-dispatch") is not None:
+            return "executor-dispatch"
+    if any(item.startswith("dispatch-") for item in state.decision.next_legal_actions):
+        preferred_node = state.handoff.initial_execution_intent.preferred_node
+        if workflow.node(preferred_node) is not None:
+            return preferred_node
+        if workflow.node("executor-dispatch") is not None:
+            return "executor-dispatch"
+    if action == "hold-for-review" and state.open_findings and workflow.node("review-dispatch") is not None:
+        return "review-dispatch"
+    return None
+
+
+def _load_product_run_path(path: Path) -> ProductRunState:
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as error:
+        raise ValueError(f"Invalid product run JSON: {path.as_posix()}") from error
+    state = ProductRunState.from_record(payload)
+    if state is None:
+        raise ValueError(f"Invalid product run payload: {path.as_posix()}")
+    return state
 
 
 def _matching_executors(required_capabilities: tuple[str, ...]) -> tuple[str, ...]:

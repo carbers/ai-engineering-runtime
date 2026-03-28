@@ -1,10 +1,10 @@
 # CURRENT
 
 ## Current phase
-Phase 4 complete — the product-oriented runtime is now hardened for local daily dogfood with stronger intake preview, review-repair-closeout closure, and richer CLI observability.
+Phase 4 complete — the product-oriented runtime is now hardened for local daily dogfood with stronger intake preview, review-repair-closeout closure, a global run catalog, and richer CLI observability.
 
 ## Current target
-Use the runtime as a day-to-day control-plane workflow tool: compile chat and prompt intake predictably, route implementation and repair to Codex by default, route review through a review executor path, and close runs from the CLI without opening raw JSON.
+Use the runtime as a day-to-day control-plane workflow tool: compile chat and prompt intake predictably, recover active runs quickly from the CLI, route implementation and repair to Codex by default, route review through a review executor path, and close runs without opening raw JSON.
 
 ## Active slice
 No active implementation slice. The runtime is ready for daily local dogfood and for narrow extension through new specs.
@@ -36,7 +36,7 @@ Executor adapters: `shell` (preview + echo), `codex` (mock-backed submit; real b
 ## In scope now
 - operating the runtime as the CLI-first control plane for day-to-day SOP workflow work
 - previewing handoff compilation and candidate actions before dispatch
-- using inspect / retry / resume / close as the primary run-management surface
+- using runs / inspect / retry / resume / close as the primary run-management surface
 - creating narrow task specs for new extension slices under `ai/doc/specs/`
 - keeping `ai/*` SOP docs aligned as the upstream starter evolves
 - wiring the Codex adapter backend seam to a live Codex CLI when that need arises
@@ -65,9 +65,9 @@ Executor adapters: `shell` (preview + echo), `codex` (mock-backed submit; real b
 None. All recent slices were standard plan → spec → implement → validate → closeout cycles.
 
 ## Next 3 actions
-1. Use `ae compile-handoff --preview` or `ae run --preview-handoff` before dispatching real work.
-2. Wire the Codex adapter backend seam to a live Codex CLI when that integration need surfaces.
-3. Open a new spec only for genuine extension needs; do not add speculative nodes.
+1. Use `ae runs` to recover active local work, then drill into `ae inspect <run-id>` for one run.
+2. Use `ae compile-handoff --preview` or `ae run --preview-handoff` before dispatching real work.
+3. Wire the Codex adapter backend seam to a live Codex CLI when that integration need surfaces.
 
 ## Risks to watch
 - the Codex adapter backend remains mock-backed; live integration will require an explicit new spec

@@ -94,6 +94,7 @@ ae run --from-prompt tests/fixtures/product/review-loop-prompt.txt --dry-run
 ae compile-handoff --from-prompt tests/fixtures/product/review-loop-prompt.txt --out .runtime/compiled/review-loop.json
 ae compile-handoff --from-prompt tests/fixtures/product/review-loop-prompt.txt --preview
 ae validate-handoff --handoff .runtime/compiled/review-loop.json
+ae runs --limit 10
 ae inspect <run-id>
 ae resume <run-id>
 ae retry <run-id> --node repair-dispatch
@@ -102,7 +103,9 @@ ae close <run-id>
 
 Those commands persist product-run state under `.runtime/product-runs/` and report:
 
+- a global run catalog via `ae runs` so you can recover active local work without knowing a run id first
 - active, parked, and blocked lanes
+- workflow phase and node traces so the current run path is visible at a glance
 - phase gate outcomes and why auto-advance is or is not allowed
 - compile preview defaults, warnings, and unresolved ambiguity before dispatch
 - artifact gaps grouped by planning, execution, and review/closeout needs
@@ -113,7 +116,8 @@ Those commands persist product-run state under `.runtime/product-runs/` and repo
 The current productized runtime now treats next-step control as a gated action rather than a default continuation:
 
 - `phase complete` does not auto-advance into more planning or closeout work
-- `inspect` shows the default action, all legal actions, and why auto-advance is disabled
+- `ae runs` gives a compact multi-run view before you drill into `inspect`
+- `inspect` shows the workflow trace, default action, all legal actions, and why auto-advance is disabled
 - review findings are normalized into one repair surface and can drive `repair-dispatch -> validation -> closeout`
 - repair rounds are capped by policy and escalate to review when the loop should stop
 

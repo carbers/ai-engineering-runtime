@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 from contextlib import redirect_stderr, redirect_stdout
+from datetime import UTC, datetime
 import io
 import json
 from pathlib import Path
 import sys
 import textwrap
 import unittest
+from unittest.mock import patch
+from uuid import UUID
 
 ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "src"
@@ -124,6 +127,9 @@ class ProductCliTests(unittest.TestCase):
             self.assertEqual(exit_code, 0)
             self.assertEqual(stderr, "")
             self.assertIn("run completed", stdout)
+            self.assertIn("Workflow Phases:", stdout)
+            self.assertIn("Workflow Nodes:", stdout)
+            self.assertIn("Suggested Node: executor-dispatch", stdout)
             self.assertIn("Current Phase: M2-prepared", stdout)
             self.assertIn("Active Lane: mvp-lore-4b (M2-prepared)", stdout)
             self.assertIn("Parked Lanes: productlib-data-pipeline", stdout)
@@ -214,6 +220,99 @@ class ProductCliTests(unittest.TestCase):
             self.assertIn("Status: complete", close_stdout)
             self.assertIn("Default Action: close-run", close_stdout)
             self.assertIn("Closeable: yes", close_stdout)
+
+    def test_runs_lists_product_runs_with_key_state(self) -> None:
+        with repo_temp_dir() as temp_dir:
+            root = Path(temp_dir)
+            _copy_fixture(root, "jx3-chat.txt", "inputs/jx3-chat.txt")
+            _copy_fixture(root, "review-loop-prompt.txt", "inputs/review-loop-prompt.txt")
+
+            first_exit, first_stdout, first_stderr = _run_cli(root, ["run", "--from-chat", "inputs/jx3-chat.txt"])
+            second_exit, second_stdout, second_stderr = _run_cli(
+                root,
+                ["run", "--from-prompt", "inputs/review-loop-prompt.txt"],
+            )
+
+            self.assertEqual(first_exit, 0)
+            self.assertEqual(second_exit, 0)
+            self.assertEqual(first_stderr, "")
+            self.assertEqual(second_stderr, "")
+
+            first_run_id = _extract_run_id(first_stdout)
+            second_run_id = _extract_run_id(second_stdout)
+
+            exit_code, runs_stdout, runs_stderr = _run_cli(root, ["runs", "--limit", "10"])
+
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(runs_stderr, "")
+            self.assertIn("Product Runs: 2", runs_stdout)
+            self.assertIn(first_run_id, runs_stdout)
+            self.assertIn(second_run_id, runs_stdout)
+            self.assertIn("action=hold-for-review", runs_stdout)
+            self.assertIn("phase=", runs_stdout)
+
+    def test_runs_skips_invalid_product_run_files(self) -> None:
+        with repo_temp_dir() as temp_dir:
+            root = Path(temp_dir)
+            _write_repo_file(root, ".runtime/product-runs/bad.json", "{not valid json")
+
+            exit_code, stdout, stderr = _run_cli(root, ["runs"])
+
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(stderr, "")
+            self.assertIn("Product Runs: 0", stdout)
+            self.assertIn("Skipped Invalid Runs: bad.json", stdout)
+
+    def test_inspect_reports_invalid_product_run_payload(self) -> None:
+        with repo_temp_dir() as temp_dir:
+            root = Path(temp_dir)
+            _write_repo_file(root, ".runtime/product-runs/corrupt-run.json", "{not valid json")
+
+            exit_code, stdout, stderr = _run_cli(root, ["inspect", "corrupt-run"])
+
+            self.assertEqual(exit_code, 1)
+            self.assertEqual(stdout, "")
+            self.assertIn("inspect failed", stderr)
+            self.assertIn("runtime-data-error", stderr)
+            self.assertIn("Invalid product run JSON", stderr)
+
+    def test_run_ids_stay_unique_within_same_second(self) -> None:
+        with repo_temp_dir() as temp_dir:
+            root = Path(temp_dir)
+            _copy_fixture(root, "jx3-chat.txt", "inputs/jx3-chat.txt")
+
+            fixed_time = datetime(2026, 3, 28, 12, 34, 56, tzinfo=UTC)
+            generated_ids = [
+                UUID("11111111-0000-0000-0000-000000000001"),
+                UUID("22222222-0000-0000-0000-000000000002"),
+            ]
+
+            with patch("ai_engineering_runtime.product_runtime._utc_now", return_value=fixed_time), patch(
+                "ai_engineering_runtime.product_runtime.uuid4",
+                side_effect=generated_ids,
+            ):
+                first_exit, first_stdout, first_stderr = _run_cli(
+                    root,
+                    ["run", "--from-chat", "inputs/jx3-chat.txt"],
+                )
+                second_exit, second_stdout, second_stderr = _run_cli(
+                    root,
+                    ["run", "--from-chat", "inputs/jx3-chat.txt"],
+                )
+
+            self.assertEqual(first_exit, 0)
+            self.assertEqual(second_exit, 0)
+            self.assertEqual(first_stderr, "")
+            self.assertEqual(second_stderr, "")
+
+            first_run_id = _extract_run_id(first_stdout)
+            second_run_id = _extract_run_id(second_stdout)
+
+            self.assertEqual(first_run_id, "20260328T123456-repo-coding-task-11111111")
+            self.assertEqual(second_run_id, "20260328T123456-repo-coding-task-22222222")
+            self.assertNotEqual(first_run_id, second_run_id)
+            self.assertTrue((root / ".runtime" / "product-runs" / f"{first_run_id}.json").exists())
+            self.assertTrue((root / ".runtime" / "product-runs" / f"{second_run_id}.json").exists())
 
 
 if __name__ == "__main__":

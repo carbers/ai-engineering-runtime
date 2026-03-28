@@ -63,7 +63,9 @@ from ai_engineering_runtime.nodes.writeback_classifier import (
 from ai_engineering_runtime.product_runtime import (
     close_run,
     inspect_run,
+    list_product_runs,
     preview_run_from_handoff,
+    render_product_run_catalog,
     render_state_summary,
     resume_run,
     retry_run,
@@ -82,6 +84,18 @@ from ai_engineering_runtime.state import (
     WritebackCandidateKind,
     WritebackDestination,
 )
+
+
+PRODUCT_COMMANDS = frozenset({
+    "run",
+    "compile-handoff",
+    "validate-handoff",
+    "runs",
+    "inspect",
+    "resume",
+    "retry",
+    "close",
+})
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -157,6 +171,17 @@ def build_parser() -> argparse.ArgumentParser:
         help="Attempt closeout for one product run.",
     )
     close_parser.add_argument("run_id", help="Product run id.")
+
+    runs_parser = subparsers.add_parser(
+        "runs",
+        help="List persisted product runs with their current status and next action.",
+    )
+    runs_parser.add_argument(
+        "--limit",
+        type=int,
+        default=10,
+        help="Maximum number of newest product runs to show.",
+    )
 
     plan_readiness = subparsers.add_parser(
         "plan-readiness-check",
@@ -472,14 +497,7 @@ def main(
 ) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
-    if args.command not in {
-        "run",
-        "compile-handoff",
-        "validate-handoff",
-        "inspect",
-        "resume",
-        "retry",
-        "close",
+    if args.command not in PRODUCT_COMMANDS | {
         "plan-readiness-check",
         "task-spec-readiness-check",
         "validation-collect",
@@ -500,7 +518,7 @@ def main(
         return 1
 
     adapter = FileSystemAdapter(repo_root or Path.cwd())
-    if args.command in {"run", "compile-handoff", "validate-handoff", "inspect", "resume", "retry", "close"}:
+    if args.command in PRODUCT_COMMANDS:
         return _run_product_command(args, adapter)
 
     engine = RuntimeEngine(adapter)
@@ -681,77 +699,88 @@ def main(
 
 
 def _run_product_command(args: argparse.Namespace, adapter: FileSystemAdapter) -> int:
-    if args.command == "compile-handoff":
-        handoff, reasons = _resolve_handoff_from_args(adapter, args)
-        if handoff is None:
-            _emit_runtime_reasons("compile-handoff failed", reasons)
-            return 1
-        preview_state = None
-        if args.preview:
-            preview_result = preview_run_from_handoff(adapter, handoff, force_workflow_id=args.workflow)
-            preview_state = preview_result.state
-        if args.out:
-            output_path = adapter.resolve(Path(args.out))
-            adapter.write_json(output_path, handoff.to_record())
-        _emit_handoff_summary(
-            handoff,
-            adapter,
-            output_path=Path(args.out) if args.out else None,
-            preview=args.preview,
-            preview_state=preview_state,
-        )
-        return 0
+    try:
+        if args.command == "compile-handoff":
+            handoff, reasons = _resolve_handoff_from_args(adapter, args)
+            if handoff is None:
+                _emit_runtime_reasons("compile-handoff failed", reasons)
+                return 1
+            preview_state = None
+            if args.preview:
+                preview_result = preview_run_from_handoff(adapter, handoff, force_workflow_id=args.workflow)
+                preview_state = preview_result.state
+            if args.out:
+                output_path = adapter.resolve(Path(args.out))
+                adapter.write_json(output_path, handoff.to_record())
+            _emit_handoff_summary(
+                handoff,
+                adapter,
+                output_path=Path(args.out) if args.out else None,
+                preview=args.preview,
+                preview_state=preview_state,
+            )
+            return 0
 
-    if args.command == "validate-handoff":
-        handoff_path = adapter.resolve(Path(args.handoff))
-        try:
+        if args.command == "validate-handoff":
+            handoff_path = adapter.resolve(Path(args.handoff))
             handoff = load_handoff(handoff_path)
-        except (OSError, ValueError) as error:
-            _emit_runtime_error("validate-handoff", error)
-            return 1
-        reasons = validate_handoff(handoff)
-        if reasons:
-            _emit_runtime_reasons("validate-handoff failed", reasons)
-            return 1
-        preview_result = preview_run_from_handoff(adapter, handoff)
-        _emit_handoff_summary(handoff, adapter, output_path=handoff_path, preview=True, preview_state=preview_result.state)
-        return 0
+            reasons = validate_handoff(handoff)
+            if reasons:
+                _emit_runtime_reasons("validate-handoff failed", reasons)
+                return 1
+            preview_result = preview_run_from_handoff(adapter, handoff)
+            _emit_handoff_summary(handoff, adapter, output_path=handoff_path, preview=True, preview_state=preview_result.state)
+            return 0
 
-    if args.command == "run":
-        handoff, reasons = _resolve_handoff_from_args(adapter, args)
-        if handoff is None:
-            _emit_runtime_reasons("run failed", reasons)
-            return 1
-        if args.preview_handoff or args.dry_run:
-            preview_result = preview_run_from_handoff(adapter, handoff, force_workflow_id=args.workflow)
-            _emit_handoff_summary(handoff, adapter, output_path=None, preview=True, preview_state=preview_result.state)
-            if preview_result.state is not None:
-                print("")
-                print("run preview")
-                print(render_state_summary(preview_result.state))
-            return 0 if preview_result.success else 1
-        result = run_from_handoff(adapter, handoff, force_workflow_id=args.workflow)
-        _emit_product_result("run", result)
+        if args.command == "run":
+            handoff, reasons = _resolve_handoff_from_args(adapter, args)
+            if handoff is None:
+                _emit_runtime_reasons("run failed", reasons)
+                return 1
+            if args.preview_handoff or args.dry_run:
+                preview_result = preview_run_from_handoff(adapter, handoff, force_workflow_id=args.workflow)
+                _emit_handoff_summary(handoff, adapter, output_path=None, preview=True, preview_state=preview_result.state)
+                if preview_result.state is not None:
+                    print("")
+                    print("run preview")
+                    print(render_state_summary(preview_result.state))
+                return 0 if preview_result.success else 1
+            result = run_from_handoff(adapter, handoff, force_workflow_id=args.workflow)
+            _emit_product_result("run", result)
+            return 0 if result.success else 1
+
+        if args.command == "runs":
+            if args.limit < 1:
+                _emit_runtime_reasons(
+                    "runs failed",
+                    (RuntimeReason(code="invalid-limit", message="--limit must be greater than zero.", field="limit"),),
+                )
+                return 1
+            catalog = list_product_runs(adapter)
+            print(render_product_run_catalog(catalog, limit=args.limit))
+            return 0
+
+        if args.command == "inspect":
+            result = inspect_run(adapter, args.run_id)
+            _emit_product_result("inspect", result)
+            return 0 if result.success else 1
+
+        if args.command == "resume":
+            result = resume_run(adapter, args.run_id)
+            _emit_product_result("resume", result)
+            return 0 if result.success else 1
+
+        if args.command == "retry":
+            result = retry_run(adapter, args.run_id, args.node)
+            _emit_product_result("retry", result)
+            return 0 if result.success else 1
+
+        result = close_run(adapter, args.run_id)
+        _emit_product_result("close", result)
         return 0 if result.success else 1
-
-    if args.command == "inspect":
-        result = inspect_run(adapter, args.run_id)
-        _emit_product_result("inspect", result)
-        return 0 if result.success else 1
-
-    if args.command == "resume":
-        result = resume_run(adapter, args.run_id)
-        _emit_product_result("resume", result)
-        return 0 if result.success else 1
-
-    if args.command == "retry":
-        result = retry_run(adapter, args.run_id, args.node)
-        _emit_product_result("retry", result)
-        return 0 if result.success else 1
-
-    result = close_run(adapter, args.run_id)
-    _emit_product_result("close", result)
-    return 0 if result.success else 1
+    except (OSError, ValueError) as error:
+        _emit_runtime_error(args.command or "ae", error)
+        return 1
 
 
 def _emit_result(result: RunResult, adapter: FileSystemAdapter, *, dry_run: bool) -> None:
@@ -940,9 +969,9 @@ def _emit_result(result: RunResult, adapter: FileSystemAdapter, *, dry_run: bool
         print(result.rendered_output.rstrip(), file=stream)
 
 
-def _emit_runtime_error(command_name: str, error: OSError) -> None:
+def _emit_runtime_error(command_name: str, error: OSError | ValueError) -> None:
     print(f"{command_name} failed", file=sys.stderr)
-    print(f"- runtime-io-error: {_format_os_error(error)}", file=sys.stderr)
+    print(f"- {_runtime_error_code(error)}: {_format_runtime_error(error)}", file=sys.stderr)
 
 
 def _emit_runtime_reasons(status_line: str, reasons: tuple[RuntimeReason, ...]) -> None:
@@ -1043,6 +1072,18 @@ def _format_os_error(error: OSError) -> str:
     if filename is not None and str(filename) not in details:
         return f"{details}: {filename}"
     return details
+
+
+def _format_runtime_error(error: OSError | ValueError) -> str:
+    if isinstance(error, OSError):
+        return _format_os_error(error)
+    return str(error).strip() or error.__class__.__name__
+
+
+def _runtime_error_code(error: OSError | ValueError) -> str:
+    if isinstance(error, OSError):
+        return "runtime-io-error"
+    return "runtime-data-error"
 
 
 def _parse_writeback_kind(value: str | None) -> WritebackCandidateKind | None:
